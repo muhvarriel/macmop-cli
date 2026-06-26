@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.10] - 2026-06-26
+
+### Added
+- Completed Cargo package metadata for repository, homepage, keywords, and categories.
+- Added MIT `LICENSE` file.
+- Added release archive and draft Homebrew formula guidance.
+
+### Changed
+- Updated Homebrew formula draft placeholders for the alpha.10 tagged source archive.
+- No CLI behavior, JSON schema, module logic, or runtime dependency changes.
+
 ## [0.1.0-alpha.9] - 2026-06-26
 
 ### Added

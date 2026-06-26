@@ -1,7 +1,8 @@
 class Macmop < Formula
   desc "Safety-first macOS cleanup CLI"
-  homepage "https://example.com/macmop" # TODO: replace before publishing
-  url "https://example.com/macmop-v0.1.0-alpha.9.tar.gz" # TODO: replace before publishing
+  homepage "https://github.com/muhvarriel/macmop-cli"
+  url "https://github.com/muhvarriel/macmop-cli/archive/refs/tags/v0.1.0-alpha.10.tar.gz" # TODO: replace before publishing
+  # Draft only: replace url and sha256 after publishing a tagged release archive.
   sha256 "TODO_REPLACE_WITH_RELEASE_TARBALL_SHA256"
   license "MIT"
 
@@ -12,6 +13,6 @@ class Macmop < Formula
   end
 
   test do
-    assert_match "macmop 0.1.0-alpha.9", shell_output("#{bin}/macmop --version")
+    assert_match "macmop 0.1.0-alpha.10", shell_output("#{bin}/macmop --version")
   end
 end

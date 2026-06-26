@@ -2,6 +2,8 @@
 
 Safety-first macOS cleanup CLI.
 
+Repository: https://github.com/muhvarriel/macmop-cli
+
 ## MVP Safety Rules
 
 - Default mode is dry-run.
@@ -87,15 +89,21 @@ cargo build --release
 ./target/release/macmop --version
 ```
 
-Expected alpha.9 version output:
+Expected alpha.10 version output:
 
 ```text
-macmop 0.1.0-alpha.9
+macmop 0.1.0-alpha.10
 ```
 
 ## Homebrew Formula Draft
 
-A draft formula is available at `Formula/macmop.rb` for future tap publishing. It is not publishable until the placeholder release tarball URL and SHA256 are replaced with real release artifacts.
+A draft formula is available at `Formula/macmop.rb` for future tap publishing. The formula is not installable yet and should not be installed until the release archive SHA256 is replaced.
+
+Tagged source archives use this URL pattern:
+
+```text
+https://github.com/muhvarriel/macmop-cli/archive/refs/tags/v0.1.0-alpha.10.tar.gz
+```
 
 ## Validation
 
@@ -135,7 +143,7 @@ When `MACMOP_TEST_MODE=1` is set, you can override standard directories to isola
 
 ## Alpha Limitations
 
-This version (`v0.1.0-alpha.9`) is a preview release with several limitations:
+This version (`v0.1.0-alpha.10`) is a preview release with several limitations:
 - **macOS only**: Not verified on other operating systems.
 - **No sudo support**: Will skip directories requiring root access.
 - **No app uninstall**: Application leftovers can be reported, but bundle removal is disabled.
@@ -150,3 +158,4 @@ This version (`v0.1.0-alpha.9`) is a preview release with several limitations:
 - **Alpha.7 refactor-only release**: Module files were split internally; CLI behavior and JSON schemas are unchanged from alpha.6.
 - **Alpha.8 distribution hygiene release**: Source install docs, release checks, and a draft Homebrew formula were added; CLI behavior and JSON schemas are unchanged from alpha.7.
 - **Status module is read-only**: `status` reports support/debug context with bounded sampled home traversal; it does not write audit or rollback records.
+- **Alpha.10 package hygiene release**: Cargo metadata, MIT license, and release archive guidance were added; CLI behavior and JSON schemas are unchanged from alpha.9.
