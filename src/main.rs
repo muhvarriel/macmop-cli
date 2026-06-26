@@ -35,6 +35,7 @@ fn main() -> Result<()> {
         Command::Scan(args) => macmop::modules::scan::run(&ctx, args),
         Command::Apps(args) => macmop::modules::apps::run(&ctx, args),
         Command::Startup(args) => macmop::modules::startup::run(&ctx, args),
+        Command::Protect(args) => macmop::modules::protect::run(&ctx, args),
     }?;
 
     match ctx.output {

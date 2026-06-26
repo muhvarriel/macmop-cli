@@ -29,6 +29,9 @@ macmop apps inspect "Example.app"
 macmop apps leftovers
 macmop startup list
 macmop startup inspect com.example.helper
+macmop protect scan
+macmop protect startup
+macmop protect inspect protect_startup_abc123
 ```
 
 ## First-Time Setup
@@ -84,14 +87,15 @@ When `MACMOP_TEST_MODE=1` is set, you can override standard directories to isola
 
 ## Alpha Limitations
 
-This version (`v0.1.0-alpha.1`) is a preview release with several limitations:
+This version (`v0.1.0-alpha.4`) is a preview release with several limitations:
 - **macOS only**: Not verified on other operating systems.
 - **No sudo support**: Will skip directories requiring root access.
 - **No app uninstall**: Application leftovers can be reported, but bundle removal is disabled.
 - **No TUI**: The TUI dashboard is not yet implemented.
 - **Disjoint Cleanup Roots**: Scans are bounded to allowlisted cache, logs, and derived data paths only.
-- **Missing Modules**: `protect`, `privacy` modules are not yet included in this preview.
+- **Missing Modules**: `privacy` module is not yet included in this preview.
 - **Apps module is report-only**: `apps list`, `apps inspect`, `apps leftovers` are read-only; no deletion or uninstall.
 - **Startup module is report-only**: `startup list` and `startup inspect` are read-only; no enable/disable support yet.
+- **Protect module is report-only**: `protect scan`, `protect startup`, and `protect inspect` are read-only; no quarantine or deletion.
 
 

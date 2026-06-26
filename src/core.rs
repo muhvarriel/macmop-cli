@@ -396,6 +396,20 @@ pub struct StartupItem {
     pub action: PlannedActionKind,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProtectFinding {
+    pub id: String,
+    pub source: String,
+    pub label: String,
+    pub path: PathBuf,
+    pub severity: RiskLevel,
+    pub is_system_item: bool,
+    pub is_protected: bool,
+    pub evidence: Vec<String>,
+    pub recommendation: String,
+    pub action: PlannedActionKind,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.4] - 2026-06-26
+
+### Added
+- **`protect` module** (report-only): read-only suspicious persistence findings analysis.
+  - `protect scan` & `protect startup`: scan LaunchAgents and LaunchDaemons startup items and run security heuristic analysis.
+  - `protect inspect <finding-id>`: display detailed threat score and evidence for a specific persistence finding.
+- **Deterministic Finding IDs**: `protect_startup_<short_hash>` based on label, path, and rule name for reliability across runs.
+- **Threat Heuristic Scoring**:
+  - Shell interpreters as launcher binaries (`sh`, `bash`, `zsh`, `python`, etc.) -> `medium` or `high` severity findings.
+  - Missing executable paths (validated against absolute paths) -> `high` severity findings.
+  - Normal system items -> `low` severity baseline findings to separate threat risk from protection status.
+  - Benign items -> `0` findings (silent by default).
+- **Warnings Propagation**: Propagates scan-level malformed plist warnings to the JSON/NDJSON envelopes.
+- **7 integration tests** in `tests/integration_protect.rs` (40 total).
+
 ## [0.1.0-alpha.3] - 2026-06-26
 
 ### Added

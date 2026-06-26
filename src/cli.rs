@@ -89,6 +89,8 @@ pub enum Command {
     Apps(AppsArgs),
     /// Startup item report: LaunchAgents and LaunchDaemons (report-only)
     Startup(StartupArgs),
+    /// Scan for protection/persistence risks and suspicious items (report-only)
+    Protect(ProtectArgs),
 }
 
 #[derive(Debug, Args, Clone)]
@@ -202,6 +204,25 @@ pub enum StartupCommand {
     /// Inspect a single startup item by its Label
     Inspect {
         /// The Label of the startup item (e.g. com.example.helper)
+        id: String,
+    },
+}
+
+#[derive(Debug, Args, Clone)]
+pub struct ProtectArgs {
+    #[command(subcommand)]
+    pub command: ProtectCommand,
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum ProtectCommand {
+    /// Scan for protection/persistence risks and suspicious items
+    Scan,
+    /// Scan and display startup persistence findings specifically
+    Startup,
+    /// Inspect details of a specific protect finding
+    Inspect {
+        /// The finding ID (e.g. protect_startup_...)
         id: String,
     },
 }
