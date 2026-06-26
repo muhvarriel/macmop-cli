@@ -14,18 +14,34 @@ use std::{
 
 pub fn execute_plan(ctx: &AppContext, command: &str, plan: &ActionPlan) -> Result<Vec<AuditLog>> {
     let mut logs = Vec::new();
+    let mut cancelled = false;
+    let rollback_id = RollbackId(new_id("rollback"));
+
     for action in &plan.actions {
-        if ctx.is_cancelled() {
-            break;
+        if cancelled || ctx.is_cancelled() {
+            cancelled = true;
+            logs.push(AuditLog {
+                id: AuditId(new_id("audit")),
+                timestamp: unix_now(),
+                command: command.to_string(),
+                action: action.action,
+                path: action.path.clone(),
+                size_bytes: scanner::file_size(&action.path),
+                status: "cancelled".to_string(),
+                rollback_id: None,
+            });
+            audit::write_last_audit(&ctx.paths.audit_file, &logs)?;
+            continue;
         }
+
         let size = scanner::file_size(&action.path);
-        let (status, rollback_id) = match action.action {
+        let (status, action_rollback_id) = match action.action {
             PlannedActionKind::ReportOnly => ("reported".to_string(), None),
             PlannedActionKind::MoveToTrash => match move_to_trash(ctx, &action.path) {
-                Ok(rollback) => {
-                    let id = rollback.id.clone();
+                Ok(mut rollback) => {
+                    rollback.id = rollback_id.clone();
                     audit::append_rollback(&ctx.paths.rollback_file, rollback)?;
-                    ("success".to_string(), Some(id))
+                    ("success".to_string(), Some(rollback_id.clone()))
                 }
                 Err(error) => (format!("failed: {error}"), None),
             },
@@ -33,10 +49,9 @@ pub fn execute_plan(ctx: &AppContext, command: &str, plan: &ActionPlan) -> Resul
                 Ok(()) => ("success".to_string(), None),
                 Err(error) => (format!("failed: {error}"), None),
             },
-            PlannedActionKind::Quarantine => {
-                ("skipped: quarantine not in core mvp".to_string(), None)
-            }
+            PlannedActionKind::Quarantine => ("skipped_blocked".to_string(), None),
         };
+
         logs.push(AuditLog {
             id: AuditId(new_id("audit")),
             timestamp: unix_now(),
@@ -45,10 +60,15 @@ pub fn execute_plan(ctx: &AppContext, command: &str, plan: &ActionPlan) -> Resul
             path: action.path.clone(),
             size_bytes: size,
             status,
-            rollback_id,
+            rollback_id: action_rollback_id,
         });
+
+        audit::write_last_audit(&ctx.paths.audit_file, &logs)?;
+
+        if ctx.is_cancelled() {
+            cancelled = true;
+        }
     }
-    audit::write_last_audit(&ctx.paths.audit_file, &logs)?;
     Ok(logs)
 }
 
