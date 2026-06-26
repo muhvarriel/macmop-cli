@@ -66,7 +66,11 @@ pub fn run(ctx: &AppContext) -> Result<()> {
         if event::poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => break,
+                    KeyCode::Char('q') => break,
+                    KeyCode::Esc => match state.current_view {
+                        TuiView::Detail => state.back_to_sidebar(),
+                        TuiView::Sidebar => break,
+                    },
                     KeyCode::Up | KeyCode::Char('k') => match state.current_view {
                         TuiView::Sidebar => state.previous_sidebar(),
                         TuiView::Detail => state.previous_detail(),
@@ -1061,9 +1065,9 @@ fn ui(f: &mut ratatui::Frame, state: &TuiState, ctx: &AppContext) {
             Span::raw("  [Enter] Details  ").bold().fg(Color::Cyan),
         ])],
         TuiView::Detail => vec![Line::from(vec![
-            Span::raw("  [q/Esc] Quit  ").bold().fg(Color::Red),
+            Span::raw("  [q] Quit  ").bold().fg(Color::Red),
             Span::raw("  [↑/↓/j/k] Scroll  ").bold().fg(Color::Cyan),
-            Span::raw("  [Backspace] Back  ").bold().fg(Color::Cyan),
+            Span::raw("  [Esc/Backspace] Back  ").bold().fg(Color::Cyan),
         ])],
     };
 

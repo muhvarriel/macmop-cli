@@ -18,33 +18,43 @@ MacMop CLI is designed from the ground up to prevent accidental data loss and sy
 
 ## Installation
 
-### 1. Via Homebrew (Local Formula)
+### 1. Via Homebrew (recommended)
 
-Install using the verified local tap:
+Add the tap and install directly:
 
 ```bash
-brew tap local/macmop
-# Point Formula/macmop.rb to the target release asset and install
-brew install --build-from-source Formula/macmop.rb
+brew tap muhvarriel/macmop https://github.com/muhvarriel/macmop-cli
+brew install muhvarriel/macmop/macmop
+```
+
+Verify:
+
+```bash
+macmop --version
 ```
 
 ### 2. From GitHub Release Binaries
 
-Download the compiled binary for Apple Silicon macOS (`aarch64-apple-darwin`):
+Download pre-compiled binaries from the [Releases page](https://github.com/muhvarriel/macmop-cli/releases):
 
-1. Download `macmop-v0.1.0-alpha.27-aarch64-apple-darwin.tar.gz` and its `.sha256` checksum from the GitHub Releases page.
-2. Extract the archive:
-   ```bash
-   tar -xzf macmop-v0.1.0-alpha.27-aarch64-apple-darwin.tar.gz
-   ```
-3. Move the binary into your PATH (e.g., `/usr/local/bin` or `~/bin`).
+| Platform | Archive |
+|----------|---------|
+| macOS Apple Silicon (arm64) | `macmop-v*-aarch64-apple-darwin.tar.gz` |
+| macOS Intel (x86_64) | `macmop-v*-x86_64-apple-darwin.tar.gz` _(from beta.2+)_ |
+
+Verify the SHA256 checksum using the accompanying `.sha256` file, then extract and move the binary to your `PATH`:
+
+```bash
+tar -xzf macmop-v*-aarch64-apple-darwin.tar.gz
+mv macmop /usr/local/bin/
+```
 
 ### 3. From Source
 
-If you have Rust installed, install the latest revision directly:
+Requires [Rust](https://rustup.rs/) stable toolchain:
 
 ```bash
-cargo install --path .
+cargo install --git https://github.com/muhvarriel/macmop-cli
 ```
 
 ---
