@@ -95,6 +95,8 @@ pub enum Command {
     Privacy(PrivacyArgs),
     /// Maintenance task catalog and preflight checks (report-only)
     Maintenance(MaintenanceArgs),
+    /// Read-only support/debug status summary
+    Status,
 }
 
 #[derive(Debug, Args, Clone)]

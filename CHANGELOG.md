@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.9] - 2026-06-26
+
+### Added
+- **`status` command** (read-only): support/debug summary for version, schema, configured paths, audit/rollback state, available modules, and sampled home storage metadata.
+- **New core types**: `StatusSummary` and `HomeSummary`.
+- Bounded home traversal for status output: max depth 3 and max 10,000 visited entries.
+
+### Changed
+- No executor, audit write, rollback write, command behavior, or JSON schema changes.
+
 ## [0.1.0-alpha.8] - 2026-06-26
 
 ### Added

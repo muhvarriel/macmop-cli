@@ -91,4 +91,11 @@ fn test_readme_command_smoke_tests() {
     // macmop maintenance check
     let (code6, _stdout, _stderr) = run_macmop(&["maintenance", "check"]);
     assert_eq!(code6, 0);
+
+    // macmop status --json
+    let (code7, stdout, _stderr) = run_macmop(&["status", "--json"]);
+    assert_eq!(code7, 0);
+    let envelope: serde_json::Value =
+        serde_json::from_str(&stdout).expect("status stdout must be valid JSON");
+    assert_eq!(envelope["command"], "status");
 }

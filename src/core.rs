@@ -443,6 +443,34 @@ pub struct MaintenanceTask {
     pub action: PlannedActionKind,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct HomeSummary {
+    pub path: PathBuf,
+    pub exists: bool,
+    pub sampled_file_count: usize,
+    pub sampled_dir_count: usize,
+    pub sampled_size_bytes: u64,
+    pub entry_limit_reached: bool,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StatusSummary {
+    pub version: String,
+    pub schema_version: String,
+    pub test_mode: bool,
+    pub home: PathBuf,
+    pub data_dir: PathBuf,
+    pub trash: PathBuf,
+    pub audit_file: PathBuf,
+    pub rollback_file: PathBuf,
+    pub last_audit_exists: bool,
+    pub last_audit_entry_count: usize,
+    pub rollback_entry_count: usize,
+    pub available_modules: Vec<String>,
+    pub home_summary: HomeSummary,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

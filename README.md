@@ -37,6 +37,7 @@ macmop privacy browsers
 macmop privacy recent
 macmop maintenance list
 macmop maintenance check
+macmop status --json
 ```
 
 ## First-Time Setup
@@ -86,10 +87,10 @@ cargo build --release
 ./target/release/macmop --version
 ```
 
-Expected alpha.8 version output:
+Expected alpha.9 version output:
 
 ```text
-macmop 0.1.0-alpha.8
+macmop 0.1.0-alpha.9
 ```
 
 ## Homebrew Formula Draft
@@ -134,7 +135,7 @@ When `MACMOP_TEST_MODE=1` is set, you can override standard directories to isola
 
 ## Alpha Limitations
 
-This version (`v0.1.0-alpha.8`) is a preview release with several limitations:
+This version (`v0.1.0-alpha.9`) is a preview release with several limitations:
 - **macOS only**: Not verified on other operating systems.
 - **No sudo support**: Will skip directories requiring root access.
 - **No app uninstall**: Application leftovers can be reported, but bundle removal is disabled.
@@ -148,3 +149,4 @@ This version (`v0.1.0-alpha.8`) is a preview release with several limitations:
 - **Maintenance module is report-only**: `maintenance list` and `maintenance check` expose task catalog/preflight metadata only; no maintenance task is executed.
 - **Alpha.7 refactor-only release**: Module files were split internally; CLI behavior and JSON schemas are unchanged from alpha.6.
 - **Alpha.8 distribution hygiene release**: Source install docs, release checks, and a draft Homebrew formula were added; CLI behavior and JSON schemas are unchanged from alpha.7.
+- **Status module is read-only**: `status` reports support/debug context with bounded sampled home traversal; it does not write audit or rollback records.

@@ -38,6 +38,7 @@ fn main() -> Result<()> {
         Command::Protect(args) => macmop::modules::protect::run(&ctx, args),
         Command::Privacy(args) => macmop::modules::privacy::run(&ctx, args),
         Command::Maintenance(args) => macmop::modules::maintenance::run(&ctx, args),
+        Command::Status => macmop::modules::status::run(&ctx),
     }?;
 
     match ctx.output {
