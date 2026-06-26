@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.25] - 2026-06-26
+
+### Added
+- Guarded execution support for maintenance tasks: `macmop maintenance run flush_dns --apply` to flush DNS caches using user-level `/usr/bin/dscacheutil -flushcache`.
+- Testing seam override `MACMOP_MAINTENANCE_DSCACHEUTIL` to test DNS flush behavior reliably.
+- Clean execution tracking in `audit_file` (logs exit code, stdout/stderr lengths).
+
+### Changed
+- Blocked `--permanent` execution modes for all maintenance subcommands.
+- Deferred execution support for spotlight rebuilding, log rotation, and Time Machine snapshot thinning.
+- Clearly recorded rollback as `"not_reversible"` without creating rollback entries.
+
 ## [0.1.0-alpha.24] - 2026-06-26
 
 ### Added

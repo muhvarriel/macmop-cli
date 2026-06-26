@@ -42,6 +42,7 @@ macmop privacy browsers
 macmop privacy recent
 macmop maintenance list
 macmop maintenance check
+macmop maintenance run flush_dns  # flush DNS cache (macOS only, not reversible)
 macmop status --json
 macmop cloud providers
 macmop cloud scan
@@ -186,7 +187,7 @@ This version (`v0.1.0-alpha.11`) is a preview release with several limitations:
 - **Startup module supports disable/enable**: `startup disable <label>` and `startup enable <label>` are supported for user LaunchAgents; permanent deletion is blocked.
 - **Protect module supports quarantine/restore**: `protect quarantine <finding-id>` and `protect restore <quarantine-id>` are supported for user LaunchAgents; permanent deletion is blocked.
 - **Privacy module supports browser/recent cleanup**: `privacy browsers --apply` and `privacy recent --apply` are supported for caches and recent-items. Privacy cleanup currently supports browser cache and recent-item artifacts only. Cookies, passwords, sessions, autofill, shell history, and arbitrary files are never modified. `privacy scan --apply` and permanent deletions are blocked.
-- **Maintenance module is report-only**: `maintenance list` and `maintenance check` expose task catalog/preflight metadata only; no maintenance task is executed.
+- **Maintenance module supports DNS flushing**: `macmop maintenance run flush_dns --apply` is supported on macOS to flush system DNS resolver cache. Execution does not require sudo/root access. Other maintenance tasks (`rebuild_spotlight`, `thin_time_machine_snapshots`, `rotate_logs`) remain report-only/deferred. DNS flushing is not reversible; no rollback entry is created. Permanent deletion mode (`--permanent`) is blocked.
 - **Alpha.7 refactor-only release**: Module files were split internally; CLI behavior and JSON schemas are unchanged from alpha.6.
 - **Alpha.8 distribution hygiene release**: Source install docs, release checks, and a draft Homebrew formula were added; CLI behavior and JSON schemas are unchanged from alpha.7.
 - **Status module is read-only**: `status` reports support/debug context with bounded sampled home traversal; it does not write audit or rollback records.

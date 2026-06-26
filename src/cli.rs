@@ -304,6 +304,11 @@ pub enum MaintenanceCommand {
     List,
     /// Run read-only preflight checks for supported maintenance tasks
     Check,
+    /// Execute a supported maintenance task (currently only 'flush_dns')
+    Run {
+        /// The ID of the maintenance task to run
+        task: String,
+    },
 }
 
 #[derive(Debug, Args, Clone)]
