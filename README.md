@@ -24,6 +24,9 @@ macmop report last
 macmop rollback list
 macmop rollback apply <id> --apply
 macmop scan
+macmop apps list
+macmop apps inspect "Example.app"
+macmop apps leftovers
 ```
 
 ## First-Time Setup
@@ -75,6 +78,7 @@ When `MACMOP_TEST_MODE=1` is set, you can override standard directories to isola
 - `MACMOP_TRASH_DIR`: Overrides the target Trash directory.
 - `MACMOP_AUDIT_FILE`: Overrides the location of the audit log JSON.
 - `MACMOP_ROLLBACK_FILE`: Overrides the location of the rollback database JSON.
+- `MACMOP_APPS_DIRS`: Colon-separated list of directories to search for `.app` bundles (overrides `/Applications` and `~/Applications`).
 
 ## Alpha Limitations
 
@@ -85,5 +89,6 @@ This version (`v0.1.0-alpha.1`) is a preview release with several limitations:
 - **No TUI**: The TUI dashboard is not yet implemented.
 - **Disjoint Cleanup Roots**: Scans are bounded to allowlisted cache, logs, and derived data paths only.
 - **Missing Modules**: `protect`, `privacy`, and `startup` modules are not yet included in this preview.
+- **Apps module is report-only**: `apps list`, `apps inspect`, `apps leftovers` are read-only; no deletion or uninstall.
 
 

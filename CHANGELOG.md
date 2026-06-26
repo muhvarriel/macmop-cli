@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.2] - 2026-06-26
+
+### Added
+- **`apps` module** (report-only): read-only app inventory and leftover detection.
+  - `apps list`: discover installed `.app` bundles from `/Applications` and `~/Applications`.
+  - `apps inspect <app>`: read `Info.plist` metadata and enumerate associated files across 8 standard Library paths.
+  - `apps leftovers`: report likely orphaned files in `~/Library` where the source `.app` no longer exists.
+- **New core types**: `AppBundle`, `AppAssociation`, `AppLeftover`, `LeftoverConfidence`.
+- **Test seam**: `MACMOP_APPS_DIRS` (colon-separated) overrides app discovery directories when `MACMOP_TEST_MODE=1`.
+- **plist** crate added for binary/XML `Info.plist` parsing.
+- **5 new integration tests** in `tests/integration_apps.rs` (26 total).
+- Safety: all `apps` actions are `report_only`; system/Apple apps (`com.apple.*`) marked `is_system_app=true`, `risk=critical`.
+
 ## [0.1.0-alpha.1] - 2026-06-26
 
 ### Added

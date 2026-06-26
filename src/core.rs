@@ -92,6 +92,16 @@ impl AppContext {
             data_dir.join("rollback/entries.json")
         };
 
+        let apps_dirs = if is_test {
+            if let Ok(val) = std::env::var("MACMOP_APPS_DIRS") {
+                val.split(':').map(PathBuf::from).collect()
+            } else {
+                default_apps_dirs(&home)
+            }
+        } else {
+            default_apps_dirs(&home)
+        };
+
         Ok(Self {
             paths: AppPaths {
                 home,
@@ -99,6 +109,7 @@ impl AppContext {
                 trash,
                 audit_file,
                 rollback_file,
+                apps_dirs,
             },
             mode,
             output,
@@ -127,6 +138,11 @@ pub struct AppPaths {
     pub trash: PathBuf,
     pub audit_file: PathBuf,
     pub rollback_file: PathBuf,
+    pub apps_dirs: Vec<PathBuf>,
+}
+
+fn default_apps_dirs(home: &std::path::Path) -> Vec<PathBuf> {
+    vec![PathBuf::from("/Applications"), home.join("Applications")]
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -285,6 +301,56 @@ impl<T: Serialize> JsonEnvelope<T> {
             payload,
         }
     }
+}
+
+/// Confidence level for leftover association inference.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LeftoverConfidence {
+    Low,
+    Medium,
+    High,
+}
+
+impl LeftoverConfidence {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+        }
+    }
+}
+
+/// Metadata for a discovered .app bundle.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AppBundle {
+    pub name: String,
+    pub path: PathBuf,
+    pub bundle_id: String,
+    pub version: String,
+    pub size_bytes: u64,
+    pub is_system_app: bool,
+    pub risk: RiskLevel,
+}
+
+/// A file/directory associated with a known app bundle.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AppAssociation {
+    pub path: PathBuf,
+    pub kind: String,
+    pub size_bytes: u64,
+    pub exists: bool,
+}
+
+/// An orphaned file likely belonging to an uninstalled app.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AppLeftover {
+    pub path: PathBuf,
+    pub size_bytes: u64,
+    pub confidence: LeftoverConfidence,
+    pub associated_bundle_id: String,
+    pub action: PlannedActionKind,
 }
 
 #[cfg(test)]

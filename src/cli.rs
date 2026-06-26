@@ -85,6 +85,8 @@ pub enum Command {
     Rollback(RollbackArgs),
     /// Run dry-run scan across multiple modules
     Scan(ScanArgs),
+    /// App inventory, inspection, and leftover detection (report-only)
+    Apps(AppsArgs),
 }
 
 #[derive(Debug, Args, Clone)]
@@ -164,6 +166,25 @@ pub struct ScanArgs {
     /// Scan profile to run: safe, developer, creator, privacy, deep
     #[arg(long, default_value = "safe")]
     pub profile: String,
+}
+
+#[derive(Debug, Args, Clone)]
+pub struct AppsArgs {
+    #[command(subcommand)]
+    pub command: AppsCommand,
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum AppsCommand {
+    /// List all installed apps with metadata
+    List,
+    /// Inspect a single app bundle and its associated files
+    Inspect {
+        /// App name or path (e.g. "Safari.app" or "/Applications/Safari.app")
+        app: String,
+    },
+    /// Report likely orphaned files from uninstalled apps
+    Leftovers,
 }
 
 #[cfg(test)]

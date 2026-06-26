@@ -33,6 +33,7 @@ fn main() -> Result<()> {
         Command::Report(args) => macmop::modules::report::run(&ctx, args),
         Command::Rollback(args) => macmop::modules::rollback::run(&ctx, args),
         Command::Scan(args) => macmop::modules::scan::run(&ctx, args),
+        Command::Apps(args) => macmop::modules::apps::run(&ctx, args),
     }?;
 
     match ctx.output {

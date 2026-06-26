@@ -1,6 +1,6 @@
 [package]
 name = "macmop"
-version = "0.1.0"
+version = "0.1.0-alpha.2"
 edition = "2021"
 description = "Safety-first macOS cleanup CLI"
 license = "MIT"
@@ -11,6 +11,7 @@ blake3 = "1"
 clap = { version = "4", features = ["derive"] }
 ctrlc = "3"
 directories = "5"
+plist = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
