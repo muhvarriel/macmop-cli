@@ -1,8 +1,8 @@
 class Macmop < Formula
   desc "Safety-first macOS cleanup CLI"
   homepage "https://github.com/muhvarriel/macmop-cli"
-  url "https://github.com/muhvarriel/macmop-cli/releases/download/v0.2.0-beta.1/macmop-v0.2.0-beta.1-source.tar.gz"
-  sha256 "e558be33563878b039070536dbdfb2d4ebaa51da31fed4c870c3e5042d1fd0aa"
+  url "https://github.com/muhvarriel/macmop-cli/releases/download/v0.2.0-beta.2/macmop-v0.2.0-beta.2-source.tar.gz"
+  sha256 "2aba982038025a11bab45e74ce64931a897e0bfad900e4f0f91287265c0e116a"
   license "MIT"
 
   depends_on "rust" => :build
@@ -12,6 +12,6 @@ class Macmop < Formula
   end
 
   test do
-    assert_match "macmop 0.2.0-beta.1", shell_output("#{bin}/macmop --version")
+    assert_match "macmop 0.2.0-beta.2", shell_output("#{bin}/macmop --version")
   end
 end
