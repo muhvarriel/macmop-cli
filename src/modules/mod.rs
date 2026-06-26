@@ -19,6 +19,7 @@ use walkdir::WalkDir;
 
 pub mod apps;
 pub mod cleanup;
+pub mod cloud;
 pub mod clutter;
 pub mod config;
 pub mod disk;

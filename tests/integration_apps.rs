@@ -74,6 +74,7 @@ impl TestEnv {
             apps_dirs: vec![self.apps_dir.clone()],
             startup_dirs: vec![],
             quicklook_dirs: vec![],
+            cloud_dirs: vec![],
         };
         ctx
     }

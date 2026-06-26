@@ -55,6 +55,7 @@ impl TestEnv {
             apps_dirs: vec![],
             startup_dirs: vec![],
             quicklook_dirs: vec![],
+            cloud_dirs: vec![],
         };
         ctx
     }

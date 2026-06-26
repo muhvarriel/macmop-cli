@@ -116,6 +116,7 @@ impl TestEnv {
             apps_dirs: vec![],
             startup_dirs: vec![(self.agents_dir.clone(), source.to_string())],
             quicklook_dirs: vec![],
+            cloud_dirs: vec![],
         };
         ctx
     }

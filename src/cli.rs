@@ -113,6 +113,8 @@ pub enum Command {
     Tui,
     /// Inspect or validate TOML configuration settings
     Config(ConfigArgs),
+    /// Scan or list detected cloud storage provider synced paths (report-only)
+    Cloud(CloudArgs),
 }
 
 #[derive(Debug, Args, Clone)]
@@ -294,6 +296,20 @@ pub enum ConfigCommand {
         /// Custom config path to validate (optional)
         path: Option<PathBuf>,
     },
+}
+
+#[derive(Debug, Args, Clone)]
+pub struct CloudArgs {
+    #[command(subcommand)]
+    pub command: CloudCommand,
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum CloudCommand {
+    /// List detected cloud storage providers and sync folder status
+    Providers,
+    /// Bounded storage/file scan of detected cloud storage providers
+    Scan,
 }
 
 #[cfg(test)]

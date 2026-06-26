@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.18] - 2026-06-26
+
+### Added
+- Cloud storage analyzer module (`macmop cloud`).
+- Subcommands `macmop cloud providers` and `macmop cloud scan`.
+- Cloud provider detection (iCloud Drive, Dropbox, Google Drive, OneDrive).
+- Bounded file search with limits (max depth 3, max entries 10,000).
+- Sync-deletion warnings regarding cloud/local sync risks.
+
+### Changed
+- No product behavior, schema, or logic changes.
+
 ## [0.1.0-alpha.17] - 2026-06-26
 
 ### Added

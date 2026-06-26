@@ -58,6 +58,7 @@ impl TestEnv {
                 ),
             ],
             quicklook_dirs: vec![],
+            cloud_dirs: vec![],
         };
         ctx
     }

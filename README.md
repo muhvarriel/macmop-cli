@@ -40,6 +40,8 @@ macmop privacy recent
 macmop maintenance list
 macmop maintenance check
 macmop status --json
+macmop cloud providers
+macmop cloud scan
 ```
 
 ## First-Time Setup

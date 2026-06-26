@@ -104,6 +104,7 @@ fn main() -> Result<()> {
         Command::Status => macmop::modules::status::run(&ctx),
         Command::Tui => unreachable!(),
         Command::Config(args) => macmop::modules::config::run(&ctx, args),
+        Command::Cloud(args) => macmop::modules::cloud::run(&ctx, args),
     }?;
 
     match ctx.output {

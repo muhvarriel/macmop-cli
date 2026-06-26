@@ -201,6 +201,24 @@ impl AppContext {
         let startup_dirs = default_startup_dirs(&home);
         let quicklook_dirs = default_quicklook_dirs(&home);
 
+        let cloud_dirs = if is_test {
+            if let Ok(val) = std::env::var("MACMOP_CLOUD_DIRS") {
+                let mut dirs = Vec::new();
+                for pair in val.split(';') {
+                    if let Some(pos) = pair.find('=') {
+                        let name = pair[..pos].to_string();
+                        let path = PathBuf::from(&pair[pos + 1..]);
+                        dirs.push((name, path));
+                    }
+                }
+                dirs
+            } else {
+                default_cloud_dirs(&home)
+            }
+        } else {
+            default_cloud_dirs(&home)
+        };
+
         let mut custom_protected_paths = Vec::new();
         if let Some(ref safety_cfg) = config.safety {
             if let Some(ref paths_list) = safety_cfg.custom_protected_paths {
@@ -220,6 +238,7 @@ impl AppContext {
                 apps_dirs,
                 startup_dirs,
                 quicklook_dirs,
+                cloud_dirs,
             },
             mode,
             output,
@@ -258,6 +277,29 @@ pub struct AppPaths {
     /// (directory, source_label) — e.g. ("~/Library/LaunchAgents", "user_launch_agents")
     pub startup_dirs: Vec<(PathBuf, String)>,
     pub quicklook_dirs: Vec<PathBuf>,
+    pub cloud_dirs: Vec<(String, PathBuf)>,
+}
+
+fn default_cloud_dirs(home: &std::path::Path) -> Vec<(String, PathBuf)> {
+    vec![
+        (
+            "iCloud Drive".to_string(),
+            home.join("Library/Mobile Documents/com~apple~CloudDocs"),
+        ),
+        ("Dropbox".to_string(), home.join("Dropbox")),
+        (
+            "Dropbox".to_string(),
+            home.join("Library/CloudStorage/Dropbox"),
+        ),
+        (
+            "Google Drive".to_string(),
+            home.join("Library/CloudStorage/GoogleDrive"),
+        ),
+        (
+            "OneDrive".to_string(),
+            home.join("Library/CloudStorage/OneDrive"),
+        ),
+    ]
 }
 
 fn default_apps_dirs(home: &std::path::Path) -> Vec<PathBuf> {
@@ -582,6 +624,26 @@ pub struct StatusSummary {
     pub home_summary: HomeSummary,
     pub config_path: Option<PathBuf>,
     pub config_loaded: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CloudProvider {
+    pub provider: String,
+    pub path: PathBuf,
+    pub exists: bool,
+    pub sampled_file_count: usize,
+    pub sampled_dir_count: usize,
+    pub sampled_size_bytes: u64,
+    pub scan_limited: bool,
+    pub warnings: Vec<String>,
+    pub action: PlannedActionKind,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CloudScanSummary {
+    pub providers_detected: usize,
+    pub total_sampled_size_bytes: u64,
+    pub sync_warning: String,
 }
 
 #[cfg(test)]
