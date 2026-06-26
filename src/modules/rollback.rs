@@ -31,6 +31,13 @@ pub fn run(ctx: &crate::core::AppContext, args: RollbackArgs) -> Result<JsonEnve
                         entry.original_path.display()
                     )
                 })?;
+
+                // Clean up sidecar metadata JSON if this is a quarantined file
+                let meta_path = entry.current_path.with_extension("json");
+                if meta_path.exists() {
+                    let _ = fs::remove_file(meta_path);
+                }
+
                 audit::write_rollbacks(&ctx.paths.rollback_file, &entries)?;
             }
             Ok(JsonEnvelope::new(

