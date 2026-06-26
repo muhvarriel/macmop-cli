@@ -1,6 +1,6 @@
 [package]
 name = "macmop"
-version = "0.1.0-alpha.13"
+version = "0.1.0-alpha.14"
 edition = "2021"
 description = "Safety-first macOS cleanup CLI"
 homepage = "https://github.com/muhvarriel/macmop-cli"
@@ -14,9 +14,11 @@ categories = ["command-line-utilities", "filesystem"]
 anyhow = "1"
 blake3 = "1"
 clap = { version = "4", features = ["derive"] }
+crossterm = "0.29.0"
 ctrlc = "3"
 directories = "5"
 plist = "1"
+ratatui = "0.30.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"

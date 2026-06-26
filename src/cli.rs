@@ -4,11 +4,11 @@ use std::path::PathBuf;
 
 use crate::core::{ExecutionMode, OutputFormat};
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, Clone)]
 #[command(name = "macmop", version, about = "Safety-first macOS cleanup CLI")]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Command,
+    pub command: Option<Command>,
 
     #[arg(long, global = true)]
     pub dry_run: bool,
@@ -69,7 +69,7 @@ impl Cli {
     }
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Debug, Subcommand, Clone)]
 pub enum Command {
     /// Safe junk cleanup for caches, logs, and derived data
     Cleanup(CleanupArgs),
@@ -97,6 +97,8 @@ pub enum Command {
     Maintenance(MaintenanceArgs),
     /// Read-only support/debug status summary
     Status,
+    /// Interactive terminal dashboard (TUI)
+    Tui,
 }
 
 #[derive(Debug, Args, Clone)]

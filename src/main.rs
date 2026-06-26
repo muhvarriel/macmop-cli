@@ -1,7 +1,8 @@
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use macmop::cli::{Cli, Command};
 use macmop::core::{AppContext, JsonEnvelope, OutputFormat};
+use std::io::IsTerminal;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -25,7 +26,26 @@ fn main() -> Result<()> {
     let mode = cli.execution_mode()?;
     let ctx = AppContext::load(cli.config.clone(), mode, output, cancelled)?;
 
-    let result = match cli.command {
+    let run_tui = match &cli.command {
+        Some(Command::Tui) => true,
+        None => {
+            if std::io::stdout().is_terminal() {
+                true
+            } else {
+                let mut cmd = Cli::command();
+                cmd.print_help()?;
+                println!();
+                return Ok(());
+            }
+        }
+        _ => false,
+    };
+
+    if run_tui {
+        return macmop::modules::tui::run(&ctx);
+    }
+
+    let result = match cli.command.unwrap() {
         Command::Cleanup(args) => macmop::modules::cleanup::run(&ctx, args),
         Command::Disk(args) => macmop::modules::disk::run(&ctx, args),
         Command::Clutter(args) => macmop::modules::clutter::run(&ctx, args),
@@ -39,6 +59,7 @@ fn main() -> Result<()> {
         Command::Privacy(args) => macmop::modules::privacy::run(&ctx, args),
         Command::Maintenance(args) => macmop::modules::maintenance::run(&ctx, args),
         Command::Status => macmop::modules::status::run(&ctx),
+        Command::Tui => unreachable!(),
     }?;
 
     match ctx.output {

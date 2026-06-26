@@ -99,3 +99,21 @@ fn test_readme_command_smoke_tests() {
         serde_json::from_str(&stdout).expect("status stdout must be valid JSON");
     assert_eq!(envelope["command"], "status");
 }
+
+#[test]
+fn test_tui_help_parses() {
+    let (code, stdout, _stderr) = run_macmop(&["tui", "--help"]);
+    assert_eq!(code, 0);
+    assert!(stdout.contains("Interactive terminal dashboard (TUI)"));
+}
+
+#[test]
+fn test_no_args_fallback_to_help_when_non_interactive() {
+    // When executing via cargo test, stdout is not a TTY.
+    // Thus macmop with no args should print help and exit.
+    let (code, stdout, _stderr) = run_macmop(&[]);
+    assert_eq!(code, 0);
+    assert!(stdout.contains("Safety-first macOS cleanup CLI"));
+    assert!(stdout.contains("tui"));
+    assert!(stdout.contains("Interactive terminal dashboard (TUI)"));
+}

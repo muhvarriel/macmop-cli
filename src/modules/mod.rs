@@ -30,6 +30,7 @@ pub mod rollback;
 pub mod scan;
 pub mod startup;
 pub mod status;
+pub mod tui;
 
 fn top_entries(root: &Path, max_depth: usize, top: usize, min_size: u64) -> Result<Vec<Value>> {
     let mut heap: BinaryHeap<Reverse<(u64, PathBuf)>> = BinaryHeap::new();
