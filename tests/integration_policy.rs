@@ -53,7 +53,7 @@ fn test_protected_paths_are_never_planned_for_deletion() -> Result<()> {
     let protected_file = ssh_dir.join("id_rsa");
     fs::write(&protected_file, "ssh key contents")?;
 
-    let policy = Policy::new(env.home.clone());
+    let policy = Policy::new(env.home.clone(), vec![]);
 
     let mut finding = ScanFinding {
         id: FindingId(new_id("finding")),

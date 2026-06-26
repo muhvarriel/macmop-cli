@@ -3,6 +3,7 @@ use clap::{CommandFactory, Parser};
 use macmop::cli::{Cli, Command};
 use macmop::core::{AppContext, JsonEnvelope, OutputFormat};
 use std::io::IsTerminal;
+use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -22,7 +23,49 @@ fn main() -> Result<()> {
     })?;
 
     let cli = Cli::parse();
-    let output = cli.output_format()?;
+
+    // Resolve config path
+    let is_test = std::env::var("MACMOP_TEST_MODE")
+        .map(|v| v == "1")
+        .unwrap_or(false);
+    let home = if is_test {
+        std::env::var("MACMOP_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                directories::BaseDirs::new()
+                    .unwrap()
+                    .home_dir()
+                    .to_path_buf()
+            })
+    } else {
+        directories::BaseDirs::new()
+            .unwrap()
+            .home_dir()
+            .to_path_buf()
+    };
+    let config_path = cli
+        .config
+        .clone()
+        .unwrap_or_else(|| home.join(".config/macmop/config.toml"));
+
+    let is_validate_cmd = matches!(
+        cli.command,
+        Some(Command::Config(ref args)) if matches!(args.command, macmop::cli::ConfigCommand::Validate { .. })
+    );
+
+    let config = if is_validate_cmd {
+        macmop::core::Config::default()
+    } else {
+        match macmop::core::Config::load_from_path(&config_path) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
+        }
+    };
+
+    let output = cli.output_format(&config)?;
     let mode = cli.execution_mode()?;
     let ctx = AppContext::load(cli.config.clone(), mode, output, cancelled)?;
 
@@ -60,6 +103,7 @@ fn main() -> Result<()> {
         Command::Maintenance(args) => macmop::modules::maintenance::run(&ctx, args),
         Command::Status => macmop::modules::status::run(&ctx),
         Command::Tui => unreachable!(),
+        Command::Config(args) => macmop::modules::config::run(&ctx, args),
     }?;
 
     match ctx.output {

@@ -1,6 +1,6 @@
 [package]
 name = "macmop"
-version = "0.1.0-alpha.16"
+version = "0.1.0-alpha.17"
 edition = "2021"
 description = "Safety-first macOS cleanup CLI"
 homepage = "https://github.com/muhvarriel/macmop-cli"
@@ -22,6 +22,7 @@ ratatui = "0.30.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
+toml = { version = "1.1.2", features = ["preserve_order"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 walkdir = "2"

@@ -8,8 +8,8 @@ pub struct Policy {
 }
 
 impl Policy {
-    pub fn new(home: PathBuf) -> Self {
-        let protected = [
+    pub fn new(home: PathBuf, custom: Vec<PathBuf>) -> Self {
+        let mut protected: Vec<PathBuf> = [
             ".ssh",
             "Documents",
             "Desktop",
@@ -28,6 +28,8 @@ impl Policy {
                 .map(PathBuf::from),
         )
         .collect();
+
+        protected.extend(custom);
         Self { home, protected }
     }
 
@@ -94,14 +96,14 @@ mod tests {
     #[test]
     fn protected_path_wins() {
         let home = PathBuf::from("/Users/alex");
-        let policy = Policy::new(home.clone());
+        let policy = Policy::new(home.clone(), vec![]);
         assert!(policy.is_protected(&home.join(".ssh/id_rsa")));
     }
 
     #[test]
     fn cleanup_roots_are_allowlisted() {
         let home = PathBuf::from("/Users/alex");
-        let policy = Policy::new(home.clone());
+        let policy = Policy::new(home.clone(), vec![]);
         let roots = policy.cleanup_roots(&["cache".to_string()]);
         assert!(policy.allowed_cleanup_path(&home.join("Library/Caches/a"), &roots));
         assert!(!policy.allowed_cleanup_path(&home.join("Library/Application Support/a"), &roots));

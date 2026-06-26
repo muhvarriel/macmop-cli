@@ -13,12 +13,89 @@ use std::{
 
 pub const SCHEMA_VERSION: &str = "1.0";
 
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+pub struct Config {
+    pub safety: Option<SafetyConfig>,
+    pub defaults: Option<DefaultsConfig>,
+    pub paths: Option<PathsConfig>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+pub struct SafetyConfig {
+    pub custom_protected_paths: Option<Vec<PathBuf>>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+pub struct DefaultsConfig {
+    pub profile: Option<String>,
+    pub output: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+pub struct PathsConfig {
+    pub home: Option<PathBuf>,
+    pub data_dir: Option<PathBuf>,
+    pub trash_dir: Option<PathBuf>,
+}
+
+pub fn expand_tilde(path: PathBuf, home: &std::path::Path) -> PathBuf {
+    if path.starts_with("~/") {
+        if let Ok(suffix) = path.strip_prefix("~/") {
+            home.join(suffix)
+        } else {
+            path
+        }
+    } else if path.to_string_lossy() == "~" {
+        home.to_path_buf()
+    } else {
+        path
+    }
+}
+
+impl Config {
+    pub fn validate(&self) -> Result<()> {
+        if let Some(ref defaults) = self.defaults {
+            if let Some(ref output) = defaults.output {
+                match output.as_str() {
+                    "table" | "json" | "ndjson" => {}
+                    other => anyhow::bail!(
+                        "invalid defaults.output: must be one of table, json, ndjson. Found: {other}"
+                    ),
+                }
+            }
+            if let Some(ref profile) = defaults.profile {
+                match profile.as_str() {
+                    "safe" | "developer" | "creator" | "privacy" | "deep" => {}
+                    other => anyhow::bail!(
+                        "invalid defaults.profile: must be one of safe, developer, creator, privacy, deep. Found: {other}"
+                    ),
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn load_from_path(path: &std::path::Path) -> Result<Self> {
+        if path.exists() {
+            let content = std::fs::read_to_string(path)?;
+            let config: Config = toml::from_str(&content)?;
+            config.validate()?;
+            Ok(config)
+        } else {
+            Ok(Config::default())
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct AppContext {
     pub paths: AppPaths,
     pub mode: ExecutionMode,
     pub output: OutputFormat,
     cancelled: Arc<AtomicBool>,
+    pub custom_protected_paths: Vec<PathBuf>,
+    pub config_path: Option<PathBuf>,
+    pub config_loaded: bool,
 }
 
 impl AppContext {
@@ -48,23 +125,42 @@ impl AppContext {
                 .to_path_buf()
         };
 
-        let data_dir = if is_test {
-            if let Ok(val) = std::env::var("MACMOP_DATA_DIR") {
-                PathBuf::from(val)
+        // Resolve config
+        let resolved_config_path = config_path
+            .clone()
+            .unwrap_or_else(|| home.join(".config/macmop/config.toml"));
+
+        let mut config = Config::default();
+        let mut config_loaded = false;
+        if resolved_config_path.exists() {
+            config = Config::load_from_path(&resolved_config_path)?;
+            config_loaded = true;
+        }
+
+        // Apply Paths Precedence
+        let data_dir = if is_test && std::env::var("MACMOP_DATA_DIR").is_ok() {
+            PathBuf::from(std::env::var("MACMOP_DATA_DIR").unwrap())
+        } else if let Some(ref paths_cfg) = config.paths {
+            if let Some(ref d) = paths_cfg.data_dir {
+                expand_tilde(d.clone(), &home)
             } else {
                 config_path
+                    .clone()
                     .and_then(|p| p.parent().map(|p| p.to_path_buf()))
                     .unwrap_or_else(|| home.join(".local/share/macmop"))
             }
         } else {
             config_path
+                .clone()
                 .and_then(|p| p.parent().map(|p| p.to_path_buf()))
                 .unwrap_or_else(|| home.join(".local/share/macmop"))
         };
 
-        let trash = if is_test {
-            if let Ok(val) = std::env::var("MACMOP_TRASH_DIR") {
-                PathBuf::from(val)
+        let trash = if is_test && std::env::var("MACMOP_TRASH_DIR").is_ok() {
+            PathBuf::from(std::env::var("MACMOP_TRASH_DIR").unwrap())
+        } else if let Some(ref paths_cfg) = config.paths {
+            if let Some(ref t) = paths_cfg.trash_dir {
+                expand_tilde(t.clone(), &home)
             } else {
                 home.join(".Trash")
             }
@@ -105,6 +201,15 @@ impl AppContext {
         let startup_dirs = default_startup_dirs(&home);
         let quicklook_dirs = default_quicklook_dirs(&home);
 
+        let mut custom_protected_paths = Vec::new();
+        if let Some(ref safety_cfg) = config.safety {
+            if let Some(ref paths_list) = safety_cfg.custom_protected_paths {
+                for path in paths_list {
+                    custom_protected_paths.push(expand_tilde(path.clone(), &home));
+                }
+            }
+        }
+
         Ok(Self {
             paths: AppPaths {
                 home,
@@ -119,6 +224,9 @@ impl AppContext {
             mode,
             output,
             cancelled,
+            custom_protected_paths,
+            config_path: Some(resolved_config_path),
+            config_loaded,
         })
     }
 
@@ -132,6 +240,9 @@ impl AppContext {
             mode,
             output: self.output,
             cancelled: Arc::clone(&self.cancelled),
+            custom_protected_paths: self.custom_protected_paths.clone(),
+            config_path: self.config_path.clone(),
+            config_loaded: self.config_loaded,
         }
     }
 }
@@ -469,6 +580,8 @@ pub struct StatusSummary {
     pub rollback_entry_count: usize,
     pub available_modules: Vec<String>,
     pub home_summary: HomeSummary,
+    pub config_path: Option<PathBuf>,
+    pub config_loaded: bool,
 }
 
 #[cfg(test)]

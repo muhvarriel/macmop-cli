@@ -20,6 +20,7 @@ use walkdir::WalkDir;
 pub mod apps;
 pub mod cleanup;
 pub mod clutter;
+pub mod config;
 pub mod disk;
 pub mod duplicates;
 pub mod maintenance;

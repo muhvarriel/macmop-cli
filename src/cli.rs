@@ -51,7 +51,7 @@ impl Cli {
         }
     }
 
-    pub fn output_format(&self) -> Result<OutputFormat> {
+    pub fn output_format(&self, config: &crate::core::Config) -> Result<OutputFormat> {
         let count = [self.json, self.ndjson, self.table]
             .into_iter()
             .filter(|v| *v)
@@ -63,6 +63,18 @@ impl Cli {
             Ok(OutputFormat::Json)
         } else if self.ndjson {
             Ok(OutputFormat::Ndjson)
+        } else if self.table {
+            Ok(OutputFormat::Table)
+        } else if let Some(ref defaults) = config.defaults {
+            if let Some(ref output_str) = defaults.output {
+                match output_str.as_str() {
+                    "json" => Ok(OutputFormat::Json),
+                    "ndjson" => Ok(OutputFormat::Ndjson),
+                    _ => Ok(OutputFormat::Table),
+                }
+            } else {
+                Ok(OutputFormat::Table)
+            }
         } else {
             Ok(OutputFormat::Table)
         }
@@ -99,6 +111,8 @@ pub enum Command {
     Status,
     /// Interactive terminal dashboard (TUI)
     Tui,
+    /// Inspect or validate TOML configuration settings
+    Config(ConfigArgs),
 }
 
 #[derive(Debug, Args, Clone)]
@@ -265,6 +279,23 @@ pub enum MaintenanceCommand {
     Check,
 }
 
+#[derive(Debug, Args, Clone)]
+pub struct ConfigArgs {
+    #[command(subcommand)]
+    pub command: ConfigCommand,
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum ConfigCommand {
+    /// Show the resolved config values
+    Show,
+    /// Validate the config file syntax and profile/output values
+    Validate {
+        /// Custom config path to validate (optional)
+        path: Option<PathBuf>,
+    },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279,6 +310,6 @@ mod tests {
     #[test]
     fn output_flags_conflict() {
         let cli = Cli::try_parse_from(["macmop", "--json", "--ndjson", "cleanup"]).unwrap();
-        assert!(cli.output_format().is_err());
+        assert!(cli.output_format(&crate::core::Config::default()).is_err());
     }
 }

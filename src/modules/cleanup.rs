@@ -1,7 +1,7 @@
 use super::*;
 
 pub fn run(ctx: &crate::core::AppContext, args: CleanupArgs) -> Result<JsonEnvelope<Value>> {
-    let policy = Policy::new(ctx.paths.home.clone());
+    let policy = Policy::new(ctx.paths.home.clone(), ctx.custom_protected_paths.clone());
     let roots = policy.cleanup_roots(&args.category);
     if !args.category.is_empty() && roots.len() != args.category.len() {
         bail!("invalid cleanup category; supported: cache, user_cache, logs, temp, xcode");

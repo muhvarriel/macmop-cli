@@ -84,6 +84,8 @@ fn test_status_reports_schema_version_paths_and_test_mode() -> Result<()> {
     assert_eq!(summary["home"], env.home.to_string_lossy().as_ref());
     assert_eq!(summary["data_dir"], env.data_dir.to_string_lossy().as_ref());
     assert_eq!(summary["trash"], env.trash_dir.to_string_lossy().as_ref());
+    assert!(summary.get("config_path").is_some());
+    assert!(summary.get("config_loaded").is_some());
     assert_eq!(
         summary["audit_file"],
         env.audit_file.to_string_lossy().as_ref()

@@ -5,7 +5,7 @@ pub fn run(ctx: &crate::core::AppContext, args: ClutterArgs) -> Result<JsonEnvel
         .path
         .unwrap_or_else(|| ctx.paths.home.join("Downloads"));
     let items = top_entries(&root, usize::MAX, args.top, args.min_size)?;
-    let policy = Policy::new(ctx.paths.home.clone());
+    let policy = Policy::new(ctx.paths.home.clone(), ctx.custom_protected_paths.clone());
     let mut findings: Vec<ScanFinding> = items
         .iter()
         .map(|item| ScanFinding {

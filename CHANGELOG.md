@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.17] - 2026-06-26
+
+### Added
+- Config file support with `~/.config/macmop/config.toml` and `--config <path>`.
+- Strict CLI > Env > Config > Defaults precedence.
+- Subcommands `macmop config show` and `macmop config validate`.
+- Support for `custom_protected_paths` added additively to safety checks.
+- Validation checks for defaults profiles and output formats.
+
+### Changed
+- No product behavior, schema, or logic changes.
+
 ## [0.1.0-alpha.16] - 2026-06-26
 
 ### Added

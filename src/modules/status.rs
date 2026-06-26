@@ -57,6 +57,8 @@ pub fn run(ctx: &crate::core::AppContext) -> Result<JsonEnvelope<Value>> {
         rollback_entry_count,
         available_modules: available_modules(),
         home_summary,
+        config_path: ctx.config_path.clone(),
+        config_loaded: ctx.config_loaded,
     };
 
     Ok(JsonEnvelope::new(
