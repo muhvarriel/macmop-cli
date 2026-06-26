@@ -861,7 +861,7 @@ dependencies = [
 
 [[package]]
 name = "macmop"
-version = "0.1.0-alpha.29"
+version = "0.2.0-beta.1"
 dependencies = [
  "anyhow",
  "blake3",

@@ -1,6 +1,6 @@
 [package]
 name = "macmop"
-version = "0.1.0-alpha.29"
+version = "0.2.0-beta.1"
 edition = "2021"
 description = "Safety-first macOS cleanup CLI"
 homepage = "https://github.com/muhvarriel/macmop-cli"
