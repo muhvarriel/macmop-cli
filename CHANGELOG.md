@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.8] - 2026-06-26
+
+### Added
+- Source install documentation for `cargo install --path .`.
+- Release build and version verification documentation.
+- Temp-root install verification workflow for safe local distribution checks.
+- Draft Homebrew formula at `Formula/macmop.rb` with explicit placeholder URL and SHA256.
+
+### Changed
+- No CLI behavior, JSON schema, command surface, or runtime dependency changes.
+
 ## [0.1.0-alpha.7] - 2026-06-26
 
 ### Changed

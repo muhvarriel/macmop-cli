@@ -1,9 +1,10 @@
 [package]
 name = "macmop"
-version = "0.1.0-alpha.7"
+version = "0.1.0-alpha.8"
 edition = "2021"
 description = "Safety-first macOS cleanup CLI"
 license = "MIT"
+readme = "README.md"
 
 [dependencies]
 anyhow = "1"

@@ -56,6 +56,46 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all
 ```
 
+## Install From Source
+
+Install the current checkout with Cargo:
+
+```bash
+cargo install --path .
+macmop --version
+```
+
+Uninstall the source-installed binary:
+
+```bash
+cargo uninstall macmop
+```
+
+Safe local install verification without mutating your normal Cargo bin directory:
+
+```bash
+cargo install --path . --root /private/tmp/macmop-install-root
+/private/tmp/macmop-install-root/bin/macmop --help
+/private/tmp/macmop-install-root/bin/macmop --version
+```
+
+Release build verification:
+
+```bash
+cargo build --release
+./target/release/macmop --version
+```
+
+Expected alpha.8 version output:
+
+```text
+macmop 0.1.0-alpha.8
+```
+
+## Homebrew Formula Draft
+
+A draft formula is available at `Formula/macmop.rb` for future tap publishing. It is not publishable until the placeholder release tarball URL and SHA256 are replaced with real release artifacts.
+
 ## Validation
 
 Preferred local workflow:
@@ -94,7 +134,7 @@ When `MACMOP_TEST_MODE=1` is set, you can override standard directories to isola
 
 ## Alpha Limitations
 
-This version (`v0.1.0-alpha.7`) is a preview release with several limitations:
+This version (`v0.1.0-alpha.8`) is a preview release with several limitations:
 - **macOS only**: Not verified on other operating systems.
 - **No sudo support**: Will skip directories requiring root access.
 - **No app uninstall**: Application leftovers can be reported, but bundle removal is disabled.
@@ -107,3 +147,4 @@ This version (`v0.1.0-alpha.7`) is a preview release with several limitations:
 - **Privacy module is report-only**: `privacy scan`, `privacy browsers`, and `privacy recent` are read-only metadata inventory; no clearing or deletion. Shell history contents are never read or emitted.
 - **Maintenance module is report-only**: `maintenance list` and `maintenance check` expose task catalog/preflight metadata only; no maintenance task is executed.
 - **Alpha.7 refactor-only release**: Module files were split internally; CLI behavior and JSON schemas are unchanged from alpha.6.
+- **Alpha.8 distribution hygiene release**: Source install docs, release checks, and a draft Homebrew formula were added; CLI behavior and JSON schemas are unchanged from alpha.7.
