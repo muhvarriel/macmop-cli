@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.15] - 2026-06-26
+
+### Added
+- Wired live data into TUI pages using cached `TuiData` loaded at startup.
+- Displays live statistics for Status, Cleanup, Apps, Startup, Protect, Privacy, and Maintenance.
+- Resilient design: failed module scans are reported as warnings and do not crash the TUI.
+
+### Changed
+- No product behavior, schema, or logic changes.
+
 ## [0.1.0-alpha.14] - 2026-06-26
 
 ### Added
