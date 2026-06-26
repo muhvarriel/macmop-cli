@@ -279,3 +279,147 @@ fn test_apps_json_schema_version_is_stable() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_apps_uninstall_direct_path_must_end_with_app() -> Result<()> {
+    let env = TestEnv::new("direct_path");
+    let ctx = env.ctx();
+    let res = apps::run(
+        &ctx,
+        macmop::cli::AppsArgs {
+            command: macmop::cli::AppsCommand::Uninstall {
+                app: env
+                    .apps_dir
+                    .join("Invalid.txt")
+                    .to_string_lossy()
+                    .to_string(),
+            },
+        },
+    );
+    assert!(res.is_err());
+    assert!(res.unwrap_err().to_string().contains("must end with .app"));
+    Ok(())
+}
+
+#[test]
+fn test_apps_uninstall_canonicalized_protected_path_is_blocked() -> Result<()> {
+    let env = TestEnv::new("protected_path");
+    let mut ctx = env.ctx();
+    let app_path = env.create_app("ProtectedApp", "com.example.protected", "1.0");
+
+    // Add app path to custom protected paths, canonicalized
+    ctx.custom_protected_paths = vec![std::fs::canonicalize(&app_path).unwrap()];
+
+    let res = apps::run(
+        &ctx,
+        macmop::cli::AppsArgs {
+            command: macmop::cli::AppsCommand::Uninstall {
+                app: "ProtectedApp".to_string(),
+            },
+        },
+    );
+    assert!(res.is_err());
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("Uninstalling system/protected app is blocked"));
+    Ok(())
+}
+
+#[test]
+fn test_apps_uninstall_exact_match_wins_over_fuzzy_ambiguity() -> Result<()> {
+    let env = TestEnv::new("exact_win");
+    env.create_app("Chrome", "com.example.chrome", "1.0");
+    env.create_app("Chrome Canary", "com.example.chrome.canary", "1.0");
+    let ctx = env.ctx();
+
+    let envelope = apps::run(
+        &ctx,
+        macmop::cli::AppsArgs {
+            command: macmop::cli::AppsCommand::Uninstall {
+                app: "Chrome".to_string(),
+            },
+        },
+    )?;
+
+    assert_eq!(
+        envelope.payload["plan_kind"].as_str().unwrap(),
+        "apps_uninstall_dry_run"
+    );
+    assert!(envelope.payload["summary"]
+        .as_str()
+        .unwrap()
+        .contains("Chrome"));
+    Ok(())
+}
+
+#[test]
+fn test_apps_uninstall_leftover_under_protected_path_is_blocked_excluded() -> Result<()> {
+    let env = TestEnv::new("leftover_blocked");
+    let mut ctx = env.ctx();
+    let _app_path = env.create_app("LeftoverBlockedApp", "com.example.leftoverblocked", "1.0");
+
+    // Create associated preference file
+    let prefs_dir = env.home.join("Library/Preferences");
+    fs::create_dir_all(&prefs_dir)?;
+    let pref_file = prefs_dir.join("com.example.leftoverblocked.plist");
+    fs::write(&pref_file, b"test")?;
+
+    // Protect this preference file specifically, canonicalized
+    ctx.custom_protected_paths = vec![std::fs::canonicalize(&pref_file).unwrap()];
+
+    let envelope = apps::run(
+        &ctx,
+        macmop::cli::AppsArgs {
+            command: macmop::cli::AppsCommand::Uninstall {
+                app: "LeftoverBlockedApp".to_string(),
+            },
+        },
+    )?;
+
+    let findings = envelope.payload["findings"].as_array().unwrap();
+    // Should NOT contain the protected preference file
+    let has_pref = findings.iter().any(|f| {
+        let path_str = f["path"].as_str().unwrap();
+        path_str.contains("com.example.leftoverblocked.plist")
+    });
+    assert!(
+        !has_pref,
+        "protected leftover path must be blocked/excluded"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_apps_uninstall_global_apply_does_not_execute_uninstall_alpha20() -> Result<()> {
+    let env = TestEnv::new("apply_no_execute");
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Apply; // Simulate global --apply flag
+    let _app_path = env.create_app("ApplyApp", "com.example.apply", "1.0");
+
+    let envelope = apps::run(
+        &ctx,
+        macmop::cli::AppsArgs {
+            command: macmop::cli::AppsCommand::Uninstall {
+                app: "ApplyApp".to_string(),
+            },
+        },
+    )?;
+
+    // Execution must still be "not_executed"
+    assert_eq!(
+        envelope.payload["execution"].as_str().unwrap(),
+        "not_executed"
+    );
+    assert_eq!(
+        envelope.payload["plan_kind"].as_str().unwrap(),
+        "apps_uninstall_dry_run"
+    );
+
+    // Actions must be report_only
+    let actions = envelope.payload["plan"]["actions"].as_array().unwrap();
+    for action in actions {
+        assert_eq!(action["action"].as_str().unwrap(), "report_only");
+    }
+    Ok(())
+}

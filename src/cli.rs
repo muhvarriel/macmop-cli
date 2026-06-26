@@ -213,6 +213,11 @@ pub enum AppsCommand {
     },
     /// Report likely orphaned files from uninstalled apps
     Leftovers,
+    /// Pre-scan and build a dry-run plan to uninstall an app (dry-run only in alpha.20)
+    Uninstall {
+        /// App name or path (e.g. "Safari.app" or "/Applications/Safari.app")
+        app: String,
+    },
 }
 
 #[derive(Debug, Args, Clone)]

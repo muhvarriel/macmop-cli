@@ -1,5 +1,7 @@
 use super::*;
-use crate::core::{AppAssociation, AppBundle, AppLeftover, LeftoverConfidence, RiskLevel};
+use crate::core::{
+    AppAssociation, AppBundle, AppLeftover, FindingId, LeftoverConfidence, RiskLevel,
+};
 use std::collections::HashSet;
 
 pub fn run(
@@ -10,6 +12,7 @@ pub fn run(
         crate::cli::AppsCommand::List => list(ctx),
         crate::cli::AppsCommand::Inspect { app } => inspect(ctx, &app),
         crate::cli::AppsCommand::Leftovers => leftovers(ctx),
+        crate::cli::AppsCommand::Uninstall { app } => uninstall(ctx, &app),
     }
 }
 
@@ -62,6 +65,228 @@ fn leftovers(ctx: &crate::core::AppContext) -> Result<JsonEnvelope<Value>> {
         json!({
             "summary": format!("leftovers: {} orphaned entries", items.len()),
             "items": items,
+        }),
+    ))
+}
+
+// ── uninstall ─────────────────────────────────────────────────────────────
+
+fn canonicalize_path(path: &Path) -> PathBuf {
+    match std::fs::canonicalize(path) {
+        Ok(p) => p,
+        Err(_) => path.to_path_buf(),
+    }
+}
+
+fn resolve_uninstall_app(app: &str, apps_dirs: &[PathBuf]) -> Result<PathBuf> {
+    // 1. Direct path check
+    let candidate = PathBuf::from(app);
+    if candidate.is_absolute() || candidate.components().count() > 1 {
+        if candidate.extension().and_then(|e| e.to_str()) != Some("app") {
+            anyhow::bail!("Direct path must end with .app: {}", candidate.display());
+        }
+        if !candidate.exists() {
+            anyhow::bail!("App path does not exist: {}", candidate.display());
+        }
+        return Ok(candidate);
+    }
+    if candidate.extension().and_then(|e| e.to_str()) == Some("app") && candidate.exists() {
+        return Ok(candidate);
+    }
+
+    let bundles = discover_bundles(apps_dirs);
+    let query_app = app.strip_suffix(".app").unwrap_or(app);
+    let get_stem = |p: &Path| -> String {
+        p.file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string()
+    };
+
+    // 2. Exact app bundle name match
+    let mut exact_bundle_matches = Vec::new();
+    for b in &bundles {
+        let stem = get_stem(&b.path);
+        if stem == query_app {
+            exact_bundle_matches.push(b.path.clone());
+        }
+    }
+    if exact_bundle_matches.len() == 1 {
+        return Ok(exact_bundle_matches.remove(0));
+    } else if exact_bundle_matches.len() > 1 {
+        return return_ambiguous_error(app, exact_bundle_matches);
+    }
+
+    // Try case-insensitive exact bundle name match
+    let mut exact_bundle_ci_matches = Vec::new();
+    for b in &bundles {
+        let stem = get_stem(&b.path);
+        if stem.eq_ignore_ascii_case(query_app) {
+            exact_bundle_ci_matches.push(b.path.clone());
+        }
+    }
+    if exact_bundle_ci_matches.len() == 1 {
+        return Ok(exact_bundle_ci_matches.remove(0));
+    } else if exact_bundle_ci_matches.len() > 1 {
+        return return_ambiguous_error(app, exact_bundle_ci_matches);
+    }
+
+    // 3. Exact display name / CFBundleName match
+    let mut exact_display_matches = Vec::new();
+    for b in &bundles {
+        if b.name == query_app {
+            exact_display_matches.push(b.path.clone());
+        }
+    }
+    if exact_display_matches.len() == 1 {
+        return Ok(exact_display_matches.remove(0));
+    } else if exact_display_matches.len() > 1 {
+        return return_ambiguous_error(app, exact_display_matches);
+    }
+
+    // Try case-insensitive exact display name match
+    let mut exact_display_ci_matches = Vec::new();
+    for b in &bundles {
+        if b.name.eq_ignore_ascii_case(query_app) {
+            exact_display_ci_matches.push(b.path.clone());
+        }
+    }
+    if exact_display_ci_matches.len() == 1 {
+        return Ok(exact_display_ci_matches.remove(0));
+    } else if exact_display_ci_matches.len() > 1 {
+        return return_ambiguous_error(app, exact_display_ci_matches);
+    }
+
+    // 4. Fuzzy substring match
+    let mut fuzzy_matches = Vec::new();
+    let query_lower = query_app.to_lowercase();
+    for b in &bundles {
+        let stem = get_stem(&b.path).to_lowercase();
+        let name_lower = b.name.to_lowercase();
+        let id_lower = b.bundle_id.to_lowercase();
+        if stem.contains(&query_lower)
+            || name_lower.contains(&query_lower)
+            || id_lower.contains(&query_lower)
+        {
+            fuzzy_matches.push(b.path.clone());
+        }
+    }
+
+    if fuzzy_matches.is_empty() {
+        anyhow::bail!("app not found: {app}");
+    } else if fuzzy_matches.len() == 1 {
+        Ok(fuzzy_matches.remove(0))
+    } else {
+        return_ambiguous_error(app, fuzzy_matches)
+    }
+}
+
+fn return_ambiguous_error(query: &str, mut paths: Vec<PathBuf>) -> Result<PathBuf> {
+    paths.sort();
+    paths.dedup();
+    let total = paths.len();
+    let display_paths: Vec<String> = paths
+        .iter()
+        .take(10)
+        .map(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string()
+        })
+        .collect();
+
+    let list_str = display_paths.join(", ");
+    if total > 10 {
+        anyhow::bail!(
+            "Ambiguous query: multiple apps match '{}'. Please specify one of: {}, ...and {} more",
+            query,
+            list_str,
+            total - 10
+        );
+    } else {
+        anyhow::bail!(
+            "Ambiguous query: multiple apps match '{}'. Please specify one of: {}",
+            query,
+            list_str
+        );
+    }
+}
+
+fn uninstall(ctx: &crate::core::AppContext, app: &str) -> Result<JsonEnvelope<Value>> {
+    let resolved_path = resolve_uninstall_app(app, &ctx.paths.apps_dirs)?;
+    let app_canonical = canonicalize_path(&resolved_path);
+
+    // Safety checks: block system/protected app bundles
+    let policy =
+        crate::policy::Policy::new(ctx.paths.home.clone(), ctx.custom_protected_paths.clone());
+    if policy.is_protected(&app_canonical) {
+        anyhow::bail!(
+            "Uninstalling system/protected app is blocked: {}",
+            app_canonical.display()
+        );
+    }
+
+    let bundle = read_bundle(&app_canonical);
+    if bundle.is_system_app || bundle.risk == RiskLevel::Critical {
+        anyhow::bail!(
+            "Uninstalling system/protected app is blocked: {}",
+            app_canonical.display()
+        );
+    }
+
+    let mut findings = Vec::new();
+
+    // 1. Add app bundle itself as a finding
+    findings.push(ScanFinding {
+        id: FindingId(crate::core::new_id("finding")),
+        module: "apps".to_string(),
+        category: "app_bundle".to_string(),
+        path: app_canonical.clone(),
+        size_bytes: bundle.size_bytes,
+        risk: RiskLevel::Low,
+        confidence: 1.0,
+        action: PlannedActionKind::MoveToTrash,
+        reason: format!("App bundle for {}", bundle.name),
+        requires_sudo: false,
+    });
+
+    // 2. Discover associated leftovers (conservative candidate locations only)
+    let assoc = associated_files(&bundle, &ctx.paths.home);
+    for item in assoc {
+        if item.exists {
+            let leftover_canonical = canonicalize_path(&item.path);
+            if policy.is_protected(&leftover_canonical) {
+                // leftover under protected path is blocked/excluded
+                continue;
+            }
+            findings.push(ScanFinding {
+                id: FindingId(crate::core::new_id("finding")),
+                module: "apps".to_string(),
+                category: item.kind.clone(),
+                path: leftover_canonical,
+                size_bytes: item.size_bytes,
+                risk: RiskLevel::Low,
+                confidence: 1.0,
+                action: PlannedActionKind::MoveToTrash,
+                reason: format!("Associated leftover for {}: {}", bundle.name, item.kind),
+                requires_sudo: false,
+            });
+        }
+    }
+
+    // Build the ActionPlan
+    let plan = crate::planner::build_action_plan(&findings, &crate::core::ExecutionMode::DryRun);
+
+    Ok(JsonEnvelope::new(
+        "apps uninstall",
+        ctx.mode.clone(),
+        json!({
+            "summary": format!("uninstall plan: {} ({} items, {} bytes)", bundle.name, plan.total_items, plan.total_size_bytes),
+            "plan_kind": "apps_uninstall_dry_run",
+            "execution": "not_executed",
+            "plan": plan,
+            "findings": findings,
         }),
     ))
 }
