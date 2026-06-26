@@ -98,6 +98,14 @@ fn test_readme_command_smoke_tests() {
     let envelope: serde_json::Value =
         serde_json::from_str(&stdout).expect("status stdout must be valid JSON");
     assert_eq!(envelope["command"], "status");
+
+    // macmop cloud providers
+    let (code8, _stdout, _stderr) = run_macmop(&["cloud", "providers"]);
+    assert_eq!(code8, 0);
+
+    // macmop cloud scan
+    let (code9, _stdout, _stderr) = run_macmop(&["cloud", "scan"]);
+    assert_eq!(code9, 0);
 }
 
 #[test]

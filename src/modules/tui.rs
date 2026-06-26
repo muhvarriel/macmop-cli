@@ -2,8 +2,8 @@ use crate::cli::{
     AppsArgs, AppsCommand, CleanupArgs, MaintenanceArgs, MaintenanceCommand, PrivacyArgs,
     PrivacyCommand, ProtectArgs, ProtectCommand, StartupArgs, StartupCommand,
 };
-use crate::core::{AppContext, StatusSummary};
-use crate::modules::{apps, cleanup, maintenance, privacy, protect, startup, status};
+use crate::core::{AppContext, CloudScanSummary, StatusSummary};
+use crate::modules::{apps, cleanup, cloud, maintenance, privacy, protect, startup, status};
 use anyhow::Result;
 use crossterm::{
     event::{self, Event, KeyCode},
@@ -21,6 +21,17 @@ use ratatui::{
 use std::io;
 
 pub const TUI_DETAIL_LIMIT: usize = 100;
+
+pub const MODULE_OVERVIEW_INDEX: usize = 0;
+pub const MODULE_CLEANUP_INDEX: usize = 1;
+pub const MODULE_CLUTTER_INDEX: usize = 2;
+pub const MODULE_DISK_INDEX: usize = 3;
+pub const MODULE_APPS_INDEX: usize = 4;
+pub const MODULE_STARTUP_INDEX: usize = 5;
+pub const MODULE_PROTECT_INDEX: usize = 6;
+pub const MODULE_PRIVACY_INDEX: usize = 7;
+pub const MODULE_MAINTENANCE_INDEX: usize = 8;
+pub const MODULE_CLOUD_INDEX: usize = 9;
 
 struct TerminalGuard;
 
@@ -99,6 +110,8 @@ pub struct TuiData {
     pub protect_findings: Option<Vec<TuiDetailItem>>,
     pub privacy_findings: Option<Vec<TuiDetailItem>>,
     pub maintenance_tasks: Option<Vec<TuiDetailItem>>,
+    pub cloud_summary: Option<CloudScanSummary>,
+    pub cloud_providers: Option<Vec<TuiDetailItem>>,
     pub warnings: Vec<String>,
 }
 
@@ -312,6 +325,45 @@ impl TuiData {
             }
         };
 
+        // 8. Load Cloud Scan
+        let (cloud_summary, cloud_providers) = match cloud::load_cloud_scan(ctx) {
+            Ok((sum, items)) => {
+                for item in &items {
+                    for w in &item.warnings {
+                        warnings.push(format!("Cloud ({}): {}", item.provider, w));
+                    }
+                }
+                let detail_items = items
+                    .into_iter()
+                    .take(TUI_DETAIL_LIMIT)
+                    .map(|item| {
+                        let limited_str = if item.scan_limited { " (bounded)" } else { "" };
+                        TuiDetailItem {
+                            title: item.provider.clone(),
+                            subtitle: item.path.to_string_lossy().to_string(),
+                            meta: format!(
+                                "{} bytes, {} files, {} dirs{}{}",
+                                item.sampled_size_bytes,
+                                item.sampled_file_count,
+                                item.sampled_dir_count,
+                                limited_str,
+                                if item.exists {
+                                    " (exists)"
+                                } else {
+                                    " (missing)"
+                                }
+                            ),
+                        }
+                    })
+                    .collect();
+                (Some(sum), Some(detail_items))
+            }
+            Err(e) => {
+                warnings.push(format!("Failed to run cloud pre-scan: {e}"));
+                (None, None)
+            }
+        };
+
         Self {
             status_summary,
             cleanup_findings,
@@ -321,6 +373,8 @@ impl TuiData {
             protect_findings,
             privacy_findings,
             maintenance_tasks,
+            cloud_summary,
+            cloud_providers,
             warnings,
         }
     }
@@ -384,6 +438,10 @@ impl TuiState {
                 name: "Maintenance",
                 description: "Preflight system optimization checklist",
             },
+            TuiModule {
+                name: "Cloud",
+                description: "Cloud storage sync folders pre-scan",
+            },
         ];
 
         let mut list_state = ListState::default();
@@ -403,8 +461,10 @@ impl TuiState {
 
     fn enter_detail(&mut self) {
         // Only allow entering details if there's actual scrollable content on the page
-        if self.list_state.selected().unwrap_or(0) != 2
-            && self.list_state.selected().unwrap_or(0) != 3
+        let selected = self.list_state.selected().unwrap_or(0);
+        if selected != MODULE_CLUTTER_INDEX
+            && selected != MODULE_DISK_INDEX
+            && selected != MODULE_OVERVIEW_INDEX
         {
             self.current_view = TuiView::Detail;
             self.detail_list_state.select(Some(0));
@@ -446,34 +506,40 @@ impl TuiState {
     fn get_current_detail_len(&self) -> usize {
         let idx = self.list_state.selected().unwrap_or(0);
         match idx {
-            1 => self
+            MODULE_CLEANUP_INDEX => self
                 .data
                 .cleanup_findings
                 .as_ref()
                 .map(|l| l.len())
                 .unwrap_or(0),
-            4 => self.data.apps.as_ref().map(|l| l.len()).unwrap_or(0),
-            5 => self
+            MODULE_APPS_INDEX => self.data.apps.as_ref().map(|l| l.len()).unwrap_or(0),
+            MODULE_STARTUP_INDEX => self
                 .data
                 .startup_items
                 .as_ref()
                 .map(|l| l.len())
                 .unwrap_or(0),
-            6 => self
+            MODULE_PROTECT_INDEX => self
                 .data
                 .protect_findings
                 .as_ref()
                 .map(|l| l.len())
                 .unwrap_or(0),
-            7 => self
+            MODULE_PRIVACY_INDEX => self
                 .data
                 .privacy_findings
                 .as_ref()
                 .map(|l| l.len())
                 .unwrap_or(0),
-            8 => self
+            MODULE_MAINTENANCE_INDEX => self
                 .data
                 .maintenance_tasks
+                .as_ref()
+                .map(|l| l.len())
+                .unwrap_or(0),
+            MODULE_CLOUD_INDEX => self
+                .data
+                .cloud_providers
                 .as_ref()
                 .map(|l| l.len())
                 .unwrap_or(0),
@@ -624,12 +690,13 @@ fn ui(f: &mut ratatui::Frame, state: &TuiState, ctx: &AppContext) {
     if let TuiView::Detail = state.current_view {
         // Render scrollable details list
         let list_data = match selected_idx {
-            1 => state.data.cleanup_findings.as_ref(),
-            4 => state.data.apps.as_ref(),
-            5 => state.data.startup_items.as_ref(),
-            6 => state.data.protect_findings.as_ref(),
-            7 => state.data.privacy_findings.as_ref(),
-            8 => state.data.maintenance_tasks.as_ref(),
+            MODULE_CLEANUP_INDEX => state.data.cleanup_findings.as_ref(),
+            MODULE_APPS_INDEX => state.data.apps.as_ref(),
+            MODULE_STARTUP_INDEX => state.data.startup_items.as_ref(),
+            MODULE_PROTECT_INDEX => state.data.protect_findings.as_ref(),
+            MODULE_PRIVACY_INDEX => state.data.privacy_findings.as_ref(),
+            MODULE_MAINTENANCE_INDEX => state.data.maintenance_tasks.as_ref(),
+            MODULE_CLOUD_INDEX => state.data.cloud_providers.as_ref(),
             _ => None,
         };
 
@@ -680,7 +747,7 @@ fn ui(f: &mut ratatui::Frame, state: &TuiState, ctx: &AppContext) {
     } else {
         // Render summary page/overview text
         let mut details_text = match selected_idx {
-            0 => {
+            MODULE_OVERVIEW_INDEX => {
                 let mut overview_lines = vec![
                     Line::from(
                         "MacMop Storage & Maintenance Dashboard"
@@ -733,7 +800,7 @@ fn ui(f: &mut ratatui::Frame, state: &TuiState, ctx: &AppContext) {
 
                 overview_lines
             }
-            1 => {
+            MODULE_CLEANUP_INDEX => {
                 let count_str = state
                     .data
                     .cleanup_findings
@@ -767,7 +834,7 @@ fn ui(f: &mut ratatui::Frame, state: &TuiState, ctx: &AppContext) {
                     Line::from("Press [Enter] to inspect safe files catalog list.".fg(Color::Cyan)),
                 ]
             }
-            2 => {
+            MODULE_CLUTTER_INDEX => {
                 vec![
                     Line::from("Clutter Module (Read-Only)".bold().fg(Color::Cyan)),
                     Line::from(""),
@@ -776,7 +843,7 @@ fn ui(f: &mut ratatui::Frame, state: &TuiState, ctx: &AppContext) {
                     Line::from("Note: Full scan triggers are not wired in this dashboard view yet."),
                 ]
             }
-            3 => {
+            MODULE_DISK_INDEX => {
                 vec![
                     Line::from("Disk Module (Read-Only)".bold().fg(Color::Cyan)),
                     Line::from(""),
@@ -785,7 +852,7 @@ fn ui(f: &mut ratatui::Frame, state: &TuiState, ctx: &AppContext) {
                     Line::from("Note: Storage mapping triggers are not wired in this dashboard view yet."),
                 ]
             }
-            4 => {
+            MODULE_APPS_INDEX => {
                 let count_str = state
                     .data
                     .apps
@@ -806,7 +873,7 @@ fn ui(f: &mut ratatui::Frame, state: &TuiState, ctx: &AppContext) {
                     Line::from("Press [Enter] to inspect applications inventory list.".fg(Color::Cyan)),
                 ]
             }
-            5 => {
+            MODULE_STARTUP_INDEX => {
                 let count_str = state
                     .data
                     .startup_items
@@ -827,7 +894,7 @@ fn ui(f: &mut ratatui::Frame, state: &TuiState, ctx: &AppContext) {
                     Line::from("Press [Enter] to inspect LaunchAgents/LaunchDaemons list.".fg(Color::Cyan)),
                 ]
             }
-            6 => {
+            MODULE_PROTECT_INDEX => {
                 let count_str = state
                     .data
                     .protect_findings
@@ -853,7 +920,7 @@ fn ui(f: &mut ratatui::Frame, state: &TuiState, ctx: &AppContext) {
                     Line::from("Press [Enter] to inspect security alerts catalog.".fg(Color::Cyan)),
                 ]
             }
-            7 => {
+            MODULE_PRIVACY_INDEX => {
                 let count_str = state
                     .data
                     .privacy_findings
@@ -874,7 +941,7 @@ fn ui(f: &mut ratatui::Frame, state: &TuiState, ctx: &AppContext) {
                     Line::from("Press [Enter] to inspect privacy artifacts list.".fg(Color::Cyan)),
                 ]
             }
-            8 => {
+            MODULE_MAINTENANCE_INDEX => {
                 let count_str = state
                     .data
                     .maintenance_tasks
@@ -894,6 +961,76 @@ fn ui(f: &mut ratatui::Frame, state: &TuiState, ctx: &AppContext) {
                     Line::from(""),
                     Line::from("Press [Enter] to inspect available maintenance tasks.".fg(Color::Cyan)),
                 ]
+            }
+            MODULE_CLOUD_INDEX => {
+                let (
+                    providers_count,
+                    existing_count,
+                    file_count,
+                    dir_count,
+                    size_str,
+                    sync_warning_msg,
+                    is_limited,
+                ) = if let Some(ref sum) = state.data.cloud_summary {
+                    (
+                        sum.total_providers.to_string(),
+                        sum.providers_detected.to_string(),
+                        sum.total_sampled_file_count.to_string(),
+                        sum.total_sampled_dir_count.to_string(),
+                        format!("{} bytes", sum.total_sampled_size_bytes),
+                        sum.sync_warning.clone(),
+                        sum.scan_limited,
+                    )
+                } else {
+                    (
+                        "Unavailable".to_string(),
+                        "Unavailable".to_string(),
+                        "Unavailable".to_string(),
+                        "Unavailable".to_string(),
+                        "Unavailable".to_string(),
+                        "Unavailable".to_string(),
+                        false,
+                    )
+                };
+                let mut lines = vec![
+                    Line::from("Cloud Module (Read-Only)".bold().fg(Color::Cyan)),
+                    Line::from(""),
+                    Line::from("Detects local synchronized directories of cloud storage providers (i iCloud Drive, Dropbox, Google Drive, OneDrive) and runs a bounded size pre-scan."),
+                    Line::from(""),
+                    Line::from(sync_warning_msg.bold().fg(Color::Yellow)),
+                    Line::from(""),
+                    Line::from("Live Statistics:".bold()),
+                    Line::from(vec![
+                        Span::raw("  Configured cloud providers count: ").fg(Color::DarkGray),
+                        Span::raw(providers_count),
+                    ]),
+                    Line::from(vec![
+                        Span::raw("  Existing cloud folders detected: ").fg(Color::DarkGray),
+                        Span::raw(existing_count),
+                    ]),
+                    Line::from(vec![
+                        Span::raw("  Sampled files count: ").fg(Color::DarkGray),
+                        Span::raw(file_count),
+                    ]),
+                    Line::from(vec![
+                        Span::raw("  Sampled directories count: ").fg(Color::DarkGray),
+                        Span::raw(dir_count),
+                    ]),
+                    Line::from(vec![
+                        Span::raw("  Sampled size: ").fg(Color::DarkGray),
+                        Span::raw(size_str),
+                    ]),
+                ];
+                if is_limited {
+                    lines.push(Line::from(
+                        "  ⚠ Scan limit cap reached; some folders are bounded.".fg(Color::Yellow),
+                    ));
+                }
+                lines.push(Line::from(""));
+                lines.push(Line::from(
+                    "Press [Enter] to inspect cloud providers details list.".fg(Color::Cyan),
+                ));
+                lines
             }
             _ => vec![],
         };
@@ -977,11 +1114,20 @@ mod tests {
         assert!(data.protect_findings.is_some());
         assert!(data.privacy_findings.is_some());
         assert!(data.maintenance_tasks.is_some());
+        assert!(data.cloud_providers.is_some());
+        assert!(data.cloud_summary.is_some());
 
         // Verify capping (TUI_DETAIL_LIMIT)
         if let Some(ref list) = data.apps {
             assert!(list.len() <= TUI_DETAIL_LIMIT);
         }
+        if let Some(ref list) = data.cloud_providers {
+            assert!(list.len() <= TUI_DETAIL_LIMIT);
+        }
+
+        // Verify cloud module registry in state
+        let state = TuiState::new(data);
+        assert!(state.modules.iter().any(|m| m.name == "Cloud"));
 
         let _ = std::fs::remove_dir_all(&base);
     }
@@ -1041,6 +1187,8 @@ mod tests {
             protect_findings: None,
             privacy_findings: None,
             maintenance_tasks: None,
+            cloud_summary: None,
+            cloud_providers: None,
             warnings: vec![],
         };
         let mut state = TuiState::new(data);

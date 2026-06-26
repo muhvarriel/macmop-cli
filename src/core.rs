@@ -641,8 +641,12 @@ pub struct CloudProvider {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CloudScanSummary {
+    pub total_providers: usize,
     pub providers_detected: usize,
+    pub total_sampled_file_count: usize,
+    pub total_sampled_dir_count: usize,
     pub total_sampled_size_bytes: u64,
+    pub scan_limited: bool,
     pub sync_warning: String,
 }
 
