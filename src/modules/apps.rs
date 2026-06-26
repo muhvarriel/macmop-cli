@@ -213,7 +213,23 @@ fn return_ambiguous_error(query: &str, mut paths: Vec<PathBuf>) -> Result<PathBu
     }
 }
 
+fn is_app_running(bundle_name: &str) -> bool {
+    if let Ok(output) = std::process::Command::new("pgrep")
+        .arg("-f")
+        .arg(bundle_name)
+        .output()
+    {
+        !output.stdout.is_empty()
+    } else {
+        false
+    }
+}
+
 fn uninstall(ctx: &crate::core::AppContext, app: &str) -> Result<JsonEnvelope<Value>> {
+    if matches!(ctx.mode, crate::core::ExecutionMode::Permanent { .. }) {
+        anyhow::bail!("Uninstall does not support permanent delete yet.");
+    }
+
     let resolved_path = resolve_uninstall_app(app, &ctx.paths.apps_dirs)?;
     let app_canonical = canonicalize_path(&resolved_path);
 
@@ -235,23 +251,17 @@ fn uninstall(ctx: &crate::core::AppContext, app: &str) -> Result<JsonEnvelope<Va
         );
     }
 
+    let mut warnings = Vec::new();
+    if is_app_running(&bundle.name) {
+        warnings.push(format!(
+            "Warning: App {} may currently be running.",
+            bundle.name
+        ));
+    }
+
     let mut findings = Vec::new();
 
-    // 1. Add app bundle itself as a finding
-    findings.push(ScanFinding {
-        id: FindingId(crate::core::new_id("finding")),
-        module: "apps".to_string(),
-        category: "app_bundle".to_string(),
-        path: app_canonical.clone(),
-        size_bytes: bundle.size_bytes,
-        risk: RiskLevel::Low,
-        confidence: 1.0,
-        action: PlannedActionKind::MoveToTrash,
-        reason: format!("App bundle for {}", bundle.name),
-        requires_sudo: false,
-    });
-
-    // 2. Discover associated leftovers (conservative candidate locations only)
+    // 1. Discover associated leftovers first (conservative candidate locations only)
     let assoc = associated_files(&bundle, &ctx.paths.home);
     for item in assoc {
         if item.exists {
@@ -275,18 +285,94 @@ fn uninstall(ctx: &crate::core::AppContext, app: &str) -> Result<JsonEnvelope<Va
         }
     }
 
+    // 2. Add app bundle itself as a finding last
+    findings.push(ScanFinding {
+        id: FindingId(crate::core::new_id("finding")),
+        module: "apps".to_string(),
+        category: "app_bundle".to_string(),
+        path: app_canonical.clone(),
+        size_bytes: bundle.size_bytes,
+        risk: RiskLevel::Low,
+        confidence: 1.0,
+        action: PlannedActionKind::MoveToTrash,
+        reason: format!("App bundle for {}", bundle.name),
+        requires_sudo: false,
+    });
+
     // Build the ActionPlan
-    let plan = crate::planner::build_action_plan(&findings, &crate::core::ExecutionMode::DryRun);
+    let plan = crate::planner::build_action_plan(&findings, &ctx.mode);
+
+    let audits = if ctx.mode.is_destructive() {
+        // Revalidate every action path immediately before execution
+        let mut revalidated_plan = plan.clone();
+        for action in &mut revalidated_plan.actions {
+            let canon = canonicalize_path(&action.path);
+
+            let is_system_app = if canon.extension().and_then(|e| e.to_str()) == Some("app") {
+                let plist_path = canon.join("Contents/Info.plist");
+                let (bundle_id, _, _) = parse_info_plist(&plist_path);
+                is_system_bundle(&canon, &bundle_id)
+            } else {
+                false
+            };
+
+            if policy.is_protected(&canon) || is_system_app {
+                action.action = PlannedActionKind::ReportOnly;
+            }
+        }
+
+        crate::executor::execute_plan(ctx, "apps uninstall", &revalidated_plan)?
+    } else {
+        Vec::new()
+    };
+
+    let moved_count = audits
+        .iter()
+        .filter(|log| log.status == "success" && log.action == PlannedActionKind::MoveToTrash)
+        .count();
+    let failed_count = audits
+        .iter()
+        .filter(|log| {
+            log.status.starts_with("failed") && log.action == PlannedActionKind::MoveToTrash
+        })
+        .count();
+    let audit_id = audits.first().map(|log| log.id.0.clone());
+    let rollback_id = audits
+        .iter()
+        .find_map(|log| log.rollback_id.as_ref().map(|rid| rid.0.clone()));
+
+    let execution_result = if ctx.mode.is_destructive() {
+        if failed_count > 0 {
+            "partial_failure"
+        } else {
+            "success"
+        }
+    } else {
+        "not_executed"
+    };
 
     Ok(JsonEnvelope::new(
         "apps uninstall",
         ctx.mode.clone(),
         json!({
-            "summary": format!("uninstall plan: {} ({} items, {} bytes)", bundle.name, plan.total_items, plan.total_size_bytes),
+            "summary": format!(
+                "uninstall plan: {} ({} items, {} bytes)",
+                bundle.name, plan.total_items, plan.total_size_bytes
+            ),
             "plan_kind": "apps_uninstall_dry_run",
-            "execution": "not_executed",
+            "execution": if ctx.mode.is_destructive() {
+                "executed"
+            } else {
+                "not_executed"
+            },
+            "execution_result": execution_result,
+            "audit_id": audit_id,
+            "rollback_id": rollback_id,
+            "moved_count": moved_count,
+            "failed_count": failed_count,
             "plan": plan,
             "findings": findings,
+            "warnings": warnings,
         }),
     ))
 }

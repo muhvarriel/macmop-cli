@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.21] - 2026-06-26
+
+### Added
+- Mutation support for `macmop apps uninstall <app> --apply` to move files to Trash.
+- Immediate revalidation of leftover and app paths against policy before execution.
+- Order-deliberate uninstall moving leftovers first, app bundle last.
+- Rollback entry creation and rollback support for restoring uninstalled apps.
+- Running-app warnings check.
+
+### Changed
+- Explicitly blocked `--permanent` execution mode for the apps uninstall command.
+
 ## [0.1.0-alpha.20] - 2026-06-26
 
 ### Added

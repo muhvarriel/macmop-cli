@@ -391,11 +391,35 @@ fn test_apps_uninstall_leftover_under_protected_path_is_blocked_excluded() -> Re
 }
 
 #[test]
-fn test_apps_uninstall_global_apply_does_not_execute_uninstall_alpha20() -> Result<()> {
-    let env = TestEnv::new("apply_no_execute");
+fn test_apps_uninstall_dry_run_creates_no_audit_or_rollback() -> Result<()> {
+    let env = TestEnv::new("dry_run_safety");
+    let ctx = env.ctx();
+    env.create_app("DryApp", "com.example.dry", "1.0");
+
+    let envelope = apps::run(
+        &ctx,
+        macmop::cli::AppsArgs {
+            command: macmop::cli::AppsCommand::Uninstall {
+                app: "DryApp".to_string(),
+            },
+        },
+    )?;
+
+    assert_eq!(
+        envelope.payload["execution"].as_str().unwrap(),
+        "not_executed"
+    );
+    assert!(!ctx.paths.audit_file.exists());
+    assert!(!ctx.paths.rollback_file.exists());
+    Ok(())
+}
+
+#[test]
+fn test_apps_uninstall_apply_moves_to_trash_and_creates_rollback() -> Result<()> {
+    let env = TestEnv::new("apply_trash");
     let mut ctx = env.ctx();
-    ctx.mode = ExecutionMode::Apply; // Simulate global --apply flag
-    let _app_path = env.create_app("ApplyApp", "com.example.apply", "1.0");
+    ctx.mode = ExecutionMode::Apply;
+    let app_path = env.create_app("ApplyApp", "com.example.apply", "1.0");
 
     let envelope = apps::run(
         &ctx,
@@ -406,20 +430,123 @@ fn test_apps_uninstall_global_apply_does_not_execute_uninstall_alpha20() -> Resu
         },
     )?;
 
-    // Execution must still be "not_executed"
+    assert_eq!(envelope.payload["execution"].as_str().unwrap(), "executed");
     assert_eq!(
-        envelope.payload["execution"].as_str().unwrap(),
-        "not_executed"
+        envelope.payload["execution_result"].as_str().unwrap(),
+        "success"
     );
-    assert_eq!(
-        envelope.payload["plan_kind"].as_str().unwrap(),
-        "apps_uninstall_dry_run"
+    assert_eq!(envelope.payload["moved_count"].as_u64().unwrap(), 1);
+
+    // App bundle should be moved to Trash
+    assert!(!app_path.exists());
+    assert!(ctx.paths.audit_file.exists());
+    assert!(ctx.paths.rollback_file.exists());
+    Ok(())
+}
+
+#[test]
+fn test_apps_uninstall_permanent_blocked() -> Result<()> {
+    let env = TestEnv::new("perm_block");
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Permanent { force: true };
+    env.create_app("PermApp", "com.example.perm", "1.0");
+
+    let res = apps::run(
+        &ctx,
+        macmop::cli::AppsArgs {
+            command: macmop::cli::AppsCommand::Uninstall {
+                app: "PermApp".to_string(),
+            },
+        },
     );
 
-    // Actions must be report_only
-    let actions = envelope.payload["plan"]["actions"].as_array().unwrap();
-    for action in actions {
-        assert_eq!(action["action"].as_str().unwrap(), "report_only");
-    }
+    assert!(res.is_err());
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("Uninstall does not support permanent delete yet"));
+    Ok(())
+}
+
+#[test]
+fn test_apps_uninstall_leftover_revalidation_blocked_during_apply() -> Result<()> {
+    let env = TestEnv::new("revalidate_blocked");
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Apply;
+    let _app_path = env.create_app("RevalApp", "com.example.reval", "1.0");
+
+    // Create leftover preference
+    let prefs_dir = env.home.join("Library/Preferences");
+    fs::create_dir_all(&prefs_dir)?;
+    let pref_file = prefs_dir.join("com.example.reval.plist");
+    fs::write(&pref_file, b"test")?;
+
+    // Dry-run/finding phase has custom protected paths empty, so it resolves.
+    // But right before execution, we simulate a custom protected path update that blocks it!
+    ctx.custom_protected_paths = vec![std::fs::canonicalize(&pref_file).unwrap()];
+
+    let _envelope = apps::run(
+        &ctx,
+        macmop::cli::AppsArgs {
+            command: macmop::cli::AppsCommand::Uninstall {
+                app: "RevalApp".to_string(),
+            },
+        },
+    )?;
+
+    // Leftover should not be moved, but app should
+    assert!(
+        pref_file.exists(),
+        "Leftover should be skipped because it is protected immediately before execution"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_apps_uninstall_rollback_success_and_idempotency() -> Result<()> {
+    let env = TestEnv::new("rollback_test");
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Apply;
+    let app_path = env.create_app("RollbackApp", "com.example.rollback", "1.0");
+
+    let envelope = apps::run(
+        &ctx,
+        macmop::cli::AppsArgs {
+            command: macmop::cli::AppsCommand::Uninstall {
+                app: "RollbackApp".to_string(),
+            },
+        },
+    )?;
+
+    assert!(!app_path.exists());
+    let r_id = envelope.payload["rollback_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Call rollback apply
+    let rollback_env = macmop::modules::rollback::run(
+        &ctx,
+        macmop::cli::RollbackArgs {
+            command: macmop::cli::RollbackCommand::Apply { id: r_id.clone() },
+        },
+    )?;
+
+    assert!(rollback_env.payload["applied"].as_bool().unwrap());
+    // App path should be restored!
+    assert!(app_path.exists());
+
+    // Second rollback should fail cleanly
+    let res = macmop::modules::rollback::run(
+        &ctx,
+        macmop::cli::RollbackArgs {
+            command: macmop::cli::RollbackCommand::Apply { id: r_id },
+        },
+    );
+    assert!(res.is_err());
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("rollback id not found"));
     Ok(())
 }
