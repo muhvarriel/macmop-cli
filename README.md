@@ -94,7 +94,7 @@ When `MACMOP_TEST_MODE=1` is set, you can override standard directories to isola
 
 ## Alpha Limitations
 
-This version (`v0.1.0-alpha.6`) is a preview release with several limitations:
+This version (`v0.1.0-alpha.7`) is a preview release with several limitations:
 - **macOS only**: Not verified on other operating systems.
 - **No sudo support**: Will skip directories requiring root access.
 - **No app uninstall**: Application leftovers can be reported, but bundle removal is disabled.
@@ -106,4 +106,4 @@ This version (`v0.1.0-alpha.6`) is a preview release with several limitations:
 - **Protect module is report-only**: `protect scan`, `protect startup`, and `protect inspect` are read-only; no quarantine or deletion.
 - **Privacy module is report-only**: `privacy scan`, `privacy browsers`, and `privacy recent` are read-only metadata inventory; no clearing or deletion. Shell history contents are never read or emitted.
 - **Maintenance module is report-only**: `maintenance list` and `maintenance check` expose task catalog/preflight metadata only; no maintenance task is executed.
-
+- **Alpha.7 refactor-only release**: Module files were split internally; CLI behavior and JSON schemas are unchanged from alpha.6.
