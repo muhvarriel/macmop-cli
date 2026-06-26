@@ -83,4 +83,12 @@ fn test_readme_command_smoke_tests() {
     // macmop rollback list
     let (code4, _stdout, _stderr) = run_macmop(&["rollback", "list"]);
     assert_eq!(code4, 0);
+
+    // macmop maintenance list
+    let (code5, _stdout, _stderr) = run_macmop(&["maintenance", "list"]);
+    assert_eq!(code5, 0);
+
+    // macmop maintenance check
+    let (code6, _stdout, _stderr) = run_macmop(&["maintenance", "check"]);
+    assert_eq!(code6, 0);
 }

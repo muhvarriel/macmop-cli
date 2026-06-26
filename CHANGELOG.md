@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.6] - 2026-06-26
+
+### Added
+- **`maintenance` module** (report-only): safe maintenance task catalog and preflight metadata.
+  - `maintenance list`: list supported future maintenance tasks without probing or execution.
+  - `maintenance check`: lightweight read-only availability checks for future tasks.
+- **New core type**: `MaintenanceTask` with `id`, `category`, `name`, `description`, `risk`, `requires_sudo`, `available`, `reason`, `future_action`, `execution_supported`, `action = report_only`.
+- Supported catalog entries: `flush_dns`, `rebuild_spotlight`, `thin_time_machine_snapshots`, `rotate_logs`.
+- Safety guarantees:
+  - No system commands are executed.
+  - No sudo is requested.
+  - No audit or rollback files are created by maintenance preflight.
+  - `execution_supported = false` for every maintenance task in alpha.6.
+- README privacy note now explicitly states shell history contents are never read or emitted.
+
 ## [0.1.0-alpha.5] - 2026-06-26
 
 ### Added

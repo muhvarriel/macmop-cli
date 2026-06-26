@@ -35,6 +35,8 @@ macmop protect inspect protect_startup_abc123
 macmop privacy scan
 macmop privacy browsers
 macmop privacy recent
+macmop maintenance list
+macmop maintenance check
 ```
 
 ## First-Time Setup
@@ -78,6 +80,8 @@ MacMop CLI enforces strict safety policies to prevent accidental data loss:
 - **Trash by Default**: Items removed during `cleanup` or other subcommands are moved to `.Trash` instead of permanent deletion.
 - **Rollback Engine**: Rollback entries are saved under `~/.config/macmop/rollback` to revert files back to their original locations.
 - **Dry-run by Default**: All scans and subcommands do not perform mutations unless run with `--apply` or `--permanent --force`.
+- **Privacy Metadata Only**: Privacy scans never read or emit shell history contents; shell history files are reported by path/size/existence metadata only.
+- **Maintenance Preflight Only**: `maintenance check` does not run maintenance tasks. It only reports what MacMop may support in a future guarded execution slice.
 
 ### Test Environment Variables
 When `MACMOP_TEST_MODE=1` is set, you can override standard directories to isolate runs (useful for integration tests and manual QA):
@@ -90,7 +94,7 @@ When `MACMOP_TEST_MODE=1` is set, you can override standard directories to isola
 
 ## Alpha Limitations
 
-This version (`v0.1.0-alpha.4`) is a preview release with several limitations:
+This version (`v0.1.0-alpha.6`) is a preview release with several limitations:
 - **macOS only**: Not verified on other operating systems.
 - **No sudo support**: Will skip directories requiring root access.
 - **No app uninstall**: Application leftovers can be reported, but bundle removal is disabled.
@@ -100,6 +104,6 @@ This version (`v0.1.0-alpha.4`) is a preview release with several limitations:
 - **Apps module is report-only**: `apps list`, `apps inspect`, `apps leftovers` are read-only; no deletion or uninstall.
 - **Startup module is report-only**: `startup list` and `startup inspect` are read-only; no enable/disable support yet.
 - **Protect module is report-only**: `protect scan`, `protect startup`, and `protect inspect` are read-only; no quarantine or deletion.
-- **Privacy module is report-only**: `privacy scan`, `privacy browsers`, and `privacy recent` are read-only metadata inventory; no clearing or deletion.
-
+- **Privacy module is report-only**: `privacy scan`, `privacy browsers`, and `privacy recent` are read-only metadata inventory; no clearing or deletion. Shell history contents are never read or emitted.
+- **Maintenance module is report-only**: `maintenance list` and `maintenance check` expose task catalog/preflight metadata only; no maintenance task is executed.
 

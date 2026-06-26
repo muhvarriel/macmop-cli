@@ -93,6 +93,8 @@ pub enum Command {
     Protect(ProtectArgs),
     /// Scan for privacy-related artifacts and metadata (report-only)
     Privacy(PrivacyArgs),
+    /// Maintenance task catalog and preflight checks (report-only)
+    Maintenance(MaintenanceArgs),
 }
 
 #[derive(Debug, Args, Clone)]
@@ -243,6 +245,20 @@ pub enum PrivacyCommand {
     Browsers,
     /// Scan and display recent items and shell history specifically
     Recent,
+}
+
+#[derive(Debug, Args, Clone)]
+pub struct MaintenanceArgs {
+    #[command(subcommand)]
+    pub command: MaintenanceCommand,
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum MaintenanceCommand {
+    /// List supported maintenance tasks without checking local availability
+    List,
+    /// Run read-only preflight checks for supported maintenance tasks
+    Check,
 }
 
 #[cfg(test)]

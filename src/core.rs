@@ -428,6 +428,21 @@ pub struct PrivacyFinding {
     pub action: PlannedActionKind,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MaintenanceTask {
+    pub id: String,
+    pub category: String,
+    pub name: String,
+    pub description: String,
+    pub risk: RiskLevel,
+    pub requires_sudo: bool,
+    pub available: bool,
+    pub reason: String,
+    pub future_action: String,
+    pub execution_supported: bool,
+    pub action: PlannedActionKind,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
