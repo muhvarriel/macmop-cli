@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.3] - 2026-06-26
+
+### Added
+- **`startup` module** (report-only): LaunchAgent and LaunchDaemon inventory.
+  - `startup list`: scan `~/Library/LaunchAgents`, `/Library/LaunchAgents`, `/Library/LaunchDaemons`.
+  - `startup inspect <label>`: deep report for a single startup item by its Label.
+- **New core type**: `StartupItem` with `label`, `program`, `program_arguments`, `run_at_load`, `keep_alive`, `source`, `is_system_item`, `risk`, `warnings`, `action`.
+- **`startup_dirs: Vec<(PathBuf, String)>`** added to `AppPaths` with source labels for test injection.
+- **Resilient plist parsing**: malformed plists become scan-level warnings; missing `Label` key falls back to filename stem with item-level warning.
+- **KeepAlive polymorphism**: handles both `bool` and condition-dict variants.
+- **Risk model**: `system_launch_daemons`/`system_launch_agents` → `critical`; user agents with `run_at_load=true` → `medium`; others → `low`. All `action = report_only`.
+- **7 new integration tests** in `tests/integration_startup.rs` (33 total).
+
 ## [0.1.0-alpha.2] - 2026-06-26
 
 ### Added

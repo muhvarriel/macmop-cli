@@ -102,6 +102,8 @@ impl AppContext {
             default_apps_dirs(&home)
         };
 
+        let startup_dirs = default_startup_dirs(&home);
+
         Ok(Self {
             paths: AppPaths {
                 home,
@@ -110,6 +112,7 @@ impl AppContext {
                 audit_file,
                 rollback_file,
                 apps_dirs,
+                startup_dirs,
             },
             mode,
             output,
@@ -139,10 +142,29 @@ pub struct AppPaths {
     pub audit_file: PathBuf,
     pub rollback_file: PathBuf,
     pub apps_dirs: Vec<PathBuf>,
+    /// (directory, source_label) — e.g. ("~/Library/LaunchAgents", "user_launch_agents")
+    pub startup_dirs: Vec<(PathBuf, String)>,
 }
 
 fn default_apps_dirs(home: &std::path::Path) -> Vec<PathBuf> {
     vec![PathBuf::from("/Applications"), home.join("Applications")]
+}
+
+fn default_startup_dirs(home: &std::path::Path) -> Vec<(PathBuf, String)> {
+    vec![
+        (
+            home.join("Library/LaunchAgents"),
+            "user_launch_agents".to_string(),
+        ),
+        (
+            PathBuf::from("/Library/LaunchAgents"),
+            "system_launch_agents".to_string(),
+        ),
+        (
+            PathBuf::from("/Library/LaunchDaemons"),
+            "system_launch_daemons".to_string(),
+        ),
+    ]
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -350,6 +372,27 @@ pub struct AppLeftover {
     pub size_bytes: u64,
     pub confidence: LeftoverConfidence,
     pub associated_bundle_id: String,
+    pub action: PlannedActionKind,
+}
+
+/// A LaunchAgent or LaunchDaemon startup item.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StartupItem {
+    /// Unique id used for `startup inspect` (same as label).
+    pub id: String,
+    pub label: String,
+    pub path: PathBuf,
+    /// Resolved executable (Program or first ProgramArguments entry).
+    pub program: Option<String>,
+    pub program_arguments: Vec<String>,
+    pub run_at_load: bool,
+    pub keep_alive: bool,
+    /// Source directory category: user_launch_agents | system_launch_agents | system_launch_daemons
+    pub source: String,
+    pub is_system_item: bool,
+    pub risk: RiskLevel,
+    /// Non-fatal parse issues (e.g. missing Label, unrecognised KeepAlive shape).
+    pub warnings: Vec<String>,
     pub action: PlannedActionKind,
 }
 

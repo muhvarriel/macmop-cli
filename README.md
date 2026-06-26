@@ -27,6 +27,8 @@ macmop scan
 macmop apps list
 macmop apps inspect "Example.app"
 macmop apps leftovers
+macmop startup list
+macmop startup inspect com.example.helper
 ```
 
 ## First-Time Setup
@@ -88,7 +90,8 @@ This version (`v0.1.0-alpha.1`) is a preview release with several limitations:
 - **No app uninstall**: Application leftovers can be reported, but bundle removal is disabled.
 - **No TUI**: The TUI dashboard is not yet implemented.
 - **Disjoint Cleanup Roots**: Scans are bounded to allowlisted cache, logs, and derived data paths only.
-- **Missing Modules**: `protect`, `privacy`, and `startup` modules are not yet included in this preview.
+- **Missing Modules**: `protect`, `privacy` modules are not yet included in this preview.
 - **Apps module is report-only**: `apps list`, `apps inspect`, `apps leftovers` are read-only; no deletion or uninstall.
+- **Startup module is report-only**: `startup list` and `startup inspect` are read-only; no enable/disable support yet.
 
 

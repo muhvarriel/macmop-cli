@@ -53,6 +53,7 @@ impl TestEnv {
             audit_file: self.audit_file.clone(),
             rollback_file: self.rollback_file.clone(),
             apps_dirs: vec![],
+            startup_dirs: vec![],
         };
         ctx
     }

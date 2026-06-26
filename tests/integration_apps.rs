@@ -72,6 +72,7 @@ impl TestEnv {
             audit_file: self._base.join("data/audit.json"),
             rollback_file: self._base.join("data/rollback.json"),
             apps_dirs: vec![self.apps_dir.clone()],
+            startup_dirs: vec![],
         };
         ctx
     }

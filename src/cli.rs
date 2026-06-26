@@ -87,6 +87,8 @@ pub enum Command {
     Scan(ScanArgs),
     /// App inventory, inspection, and leftover detection (report-only)
     Apps(AppsArgs),
+    /// Startup item report: LaunchAgents and LaunchDaemons (report-only)
+    Startup(StartupArgs),
 }
 
 #[derive(Debug, Args, Clone)]
@@ -185,6 +187,23 @@ pub enum AppsCommand {
     },
     /// Report likely orphaned files from uninstalled apps
     Leftovers,
+}
+
+#[derive(Debug, Args, Clone)]
+pub struct StartupArgs {
+    #[command(subcommand)]
+    pub command: StartupCommand,
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum StartupCommand {
+    /// List all LaunchAgents and LaunchDaemons with parsed metadata
+    List,
+    /// Inspect a single startup item by its Label
+    Inspect {
+        /// The Label of the startup item (e.g. com.example.helper)
+        id: String,
+    },
 }
 
 #[cfg(test)]
