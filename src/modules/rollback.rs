@@ -14,38 +14,49 @@ pub fn run(ctx: &crate::core::AppContext, args: RollbackArgs) -> Result<JsonEnve
             ))
         }
         RollbackCommand::Apply { id } => {
-            let mut entries = audit::read_rollbacks(&ctx.paths.rollback_file)?;
-            let index = entries
-                .iter()
-                .position(|entry| entry.id.0 == id)
-                .context("rollback id not found")?;
-            let entry = entries.remove(index);
+            let entries = audit::read_rollbacks(&ctx.paths.rollback_file)?;
+            let mut to_restore = Vec::new();
+            let mut remaining = Vec::new();
+
+            for entry in entries {
+                if entry.id.0 == id {
+                    to_restore.push(entry);
+                } else {
+                    remaining.push(entry);
+                }
+            }
+
+            if to_restore.is_empty() {
+                anyhow::bail!("rollback id not found");
+            }
+
             if ctx.mode.is_destructive() {
-                if let Some(parent) = entry.original_path.parent() {
-                    fs::create_dir_all(parent)?;
-                }
-                fs::rename(&entry.current_path, &entry.original_path).with_context(|| {
-                    format!(
-                        "cannot restore {} to {}",
-                        entry.current_path.display(),
-                        entry.original_path.display()
-                    )
-                })?;
+                for entry in &to_restore {
+                    if let Some(parent) = entry.original_path.parent() {
+                        fs::create_dir_all(parent)?;
+                    }
+                    fs::rename(&entry.current_path, &entry.original_path).with_context(|| {
+                        format!(
+                            "cannot restore {} to {}",
+                            entry.current_path.display(),
+                            entry.original_path.display()
+                        )
+                    })?;
 
-                // Clean up sidecar metadata JSON if this is a quarantined file
-                let meta_path = entry.current_path.with_extension("json");
-                if meta_path.exists() {
-                    let _ = fs::remove_file(meta_path);
+                    // Clean up sidecar metadata JSON if this is a quarantined file
+                    let meta_path = entry.current_path.with_extension("json");
+                    if meta_path.exists() {
+                        let _ = fs::remove_file(meta_path);
+                    }
                 }
-
-                audit::write_rollbacks(&ctx.paths.rollback_file, &entries)?;
+                audit::write_rollbacks(&ctx.paths.rollback_file, &remaining)?;
             }
             Ok(JsonEnvelope::new(
                 "rollback",
                 ctx.mode.clone(),
                 json!({
                     "summary": format!("rollback apply {}", id),
-                    "restored": entry,
+                    "restored": to_restore,
                     "applied": ctx.mode.is_destructive()
                 }),
             ))

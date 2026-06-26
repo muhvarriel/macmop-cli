@@ -185,7 +185,7 @@ This version (`v0.1.0-alpha.11`) is a preview release with several limitations:
 - **Apps module is report-only**: `apps list`, `apps inspect`, `apps leftovers` are read-only; no deletion or uninstall.
 - **Startup module supports disable/enable**: `startup disable <label>` and `startup enable <label>` are supported for user LaunchAgents; permanent deletion is blocked.
 - **Protect module supports quarantine/restore**: `protect quarantine <finding-id>` and `protect restore <quarantine-id>` are supported for user LaunchAgents; permanent deletion is blocked.
-- **Privacy module is report-only**: `privacy scan`, `privacy browsers`, and `privacy recent` are read-only metadata inventory; no clearing or deletion. Shell history contents are never read or emitted.
+- **Privacy module supports browser/recent cleanup**: `privacy browsers --apply` and `privacy recent --apply` are supported for caches and recent-items. Privacy cleanup currently supports browser cache and recent-item artifacts only. Cookies, passwords, sessions, autofill, shell history, and arbitrary files are never modified. `privacy scan --apply` and permanent deletions are blocked.
 - **Maintenance module is report-only**: `maintenance list` and `maintenance check` expose task catalog/preflight metadata only; no maintenance task is executed.
 - **Alpha.7 refactor-only release**: Module files were split internally; CLI behavior and JSON schemas are unchanged from alpha.6.
 - **Alpha.8 distribution hygiene release**: Source install docs, release checks, and a draft Homebrew formula were added; CLI behavior and JSON schemas are unchanged from alpha.7.

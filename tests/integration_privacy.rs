@@ -280,3 +280,196 @@ fn test_permission_denied_privacy_path_becomes_warning() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_privacy_scan_apply_is_blocked() -> Result<()> {
+    let env = TestEnv::new("scan_apply_blocked");
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Apply;
+
+    let res = privacy::run(
+        &ctx,
+        macmop::cli::PrivacyArgs {
+            command: macmop::cli::PrivacyCommand::Scan,
+        },
+    );
+
+    assert!(res.is_err());
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("privacy scan --apply is not supported"));
+    Ok(())
+}
+
+#[test]
+fn test_privacy_permanent_blocked() -> Result<()> {
+    let env = TestEnv::new("perm_blocked");
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Permanent { force: true };
+
+    let res = privacy::run(
+        &ctx,
+        macmop::cli::PrivacyArgs {
+            command: macmop::cli::PrivacyCommand::Browsers,
+        },
+    );
+
+    assert!(res.is_err());
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("Privacy module does not support permanent delete yet"));
+    Ok(())
+}
+
+#[test]
+fn test_privacy_cleanup_browsers_apply() -> Result<()> {
+    let env = TestEnv::new("browsers_apply");
+
+    let chrome_cache = env.home.join("Library/Caches/Google/Chrome");
+    fs::create_dir_all(&chrome_cache)?;
+    fs::write(chrome_cache.join("Cache.db"), "data")?;
+
+    // Create a mock chrome Application Support cookie path to ensure it is NOT cleaned
+    let chrome_support = env
+        .home
+        .join("Library/Application Support/Google/Chrome/Default");
+    fs::create_dir_all(&chrome_support)?;
+    let cookie_file = chrome_support.join("Cookies");
+    fs::write(&cookie_file, "chrome-cookies")?;
+
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Apply;
+
+    let res = privacy::run(
+        &ctx,
+        macmop::cli::PrivacyArgs {
+            command: macmop::cli::PrivacyCommand::Browsers,
+        },
+    )?;
+
+    assert_eq!(res.payload["execution"].as_str().unwrap(), "executed");
+    assert_eq!(res.payload["moved_count"].as_u64().unwrap(), 2);
+
+    // Cache should be gone (moved to Trash)
+    assert!(!chrome_cache.exists());
+
+    // Cookies file must be completely untouched!
+    assert!(cookie_file.exists());
+
+    Ok(())
+}
+
+#[test]
+fn test_privacy_cleanup_recent_apply_and_excludes_shell_history() -> Result<()> {
+    let env = TestEnv::new("recent_apply");
+
+    let finder_plist = env.home.join("Library/Preferences/com.apple.finder.plist");
+    fs::create_dir_all(finder_plist.parent().unwrap())?;
+    fs::write(&finder_plist, "data")?;
+
+    let shell_hist = env.home.join(".zsh_history");
+    fs::write(&shell_hist, "sensitive history")?;
+
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Apply;
+
+    let res = privacy::run(
+        &ctx,
+        macmop::cli::PrivacyArgs {
+            command: macmop::cli::PrivacyCommand::Recent,
+        },
+    )?;
+
+    assert_eq!(res.payload["execution"].as_str().unwrap(), "executed");
+    assert_eq!(res.payload["moved_count"].as_u64().unwrap(), 2);
+
+    // Finder plist should be gone (moved to Trash)
+    assert!(!finder_plist.exists());
+
+    // Shell history file must be completely untouched!
+    assert!(shell_hist.exists());
+
+    Ok(())
+}
+
+#[test]
+fn test_privacy_cleanup_rollback() -> Result<()> {
+    let env = TestEnv::new("rollback_test");
+
+    let chrome_cache = env.home.join("Library/Caches/Google/Chrome");
+    fs::create_dir_all(&chrome_cache)?;
+    fs::write(chrome_cache.join("Cache.db"), "data")?;
+
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Apply;
+
+    let res = privacy::run(
+        &ctx,
+        macmop::cli::PrivacyArgs {
+            command: macmop::cli::PrivacyCommand::Browsers,
+        },
+    )?;
+
+    assert_eq!(res.payload["execution"].as_str().unwrap(), "executed");
+    let rollback_id = res.payload["rollback_id"].as_str().unwrap().to_string();
+
+    // Call rollback
+    let roll_res = macmop::modules::rollback::run(
+        &ctx,
+        macmop::cli::RollbackArgs {
+            command: macmop::cli::RollbackCommand::Apply {
+                id: rollback_id.clone(),
+            },
+        },
+    )?;
+    assert!(roll_res.payload["applied"].as_bool().unwrap());
+
+    // Restored!
+    assert!(chrome_cache.exists());
+
+    // Second rollback fails cleanly
+    let roll_res2 = macmop::modules::rollback::run(
+        &ctx,
+        macmop::cli::RollbackArgs {
+            command: macmop::cli::RollbackCommand::Apply { id: rollback_id },
+        },
+    );
+    assert!(roll_res2.is_err());
+    assert!(roll_res2
+        .unwrap_err()
+        .to_string()
+        .contains("rollback id not found"));
+
+    Ok(())
+}
+
+#[test]
+fn test_privacy_cleanup_revalidation_policy_check() -> Result<()> {
+    let env = TestEnv::new("policy_reval");
+
+    let chrome_cache = env.home.join("Library/Caches/Google/Chrome");
+    fs::create_dir_all(&chrome_cache)?;
+    fs::write(chrome_cache.join("Cache.db"), "data")?;
+
+    let mut ctx = env.ctx();
+    ctx.mode = ExecutionMode::Apply;
+    // Add chrome cache to custom protected paths so it gets blocked immediately before execution
+    ctx.custom_protected_paths = vec![chrome_cache.clone()];
+
+    let res = privacy::run(
+        &ctx,
+        macmop::cli::PrivacyArgs {
+            command: macmop::cli::PrivacyCommand::Browsers,
+        },
+    )?;
+
+    assert_eq!(res.payload["execution"].as_str().unwrap(), "executed");
+    assert_eq!(res.payload["failed_count"].as_u64().unwrap(), 1);
+
+    // Cache should NOT be moved
+    assert!(chrome_cache.exists());
+
+    Ok(())
+}
