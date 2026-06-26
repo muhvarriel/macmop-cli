@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.29] - 2026-06-26
+
+### Added
+- Security policy (`SECURITY.md`) detailing vulnerability reporting guidelines.
+- GitHub issue templates (`.github/ISSUE_TEMPLATE/`) for bug reports and feature requests.
+- Manual QA checklist (`docs/QA_CHECKLIST.md`) for pre-release verification.
+- Beta readiness checklist (`docs/BETA_READINESS.md`) detailing criteria for graduation.
+
+### Changed
+- Polished `README.md` to document safety-first architecture, installation options, command examples, and limitations.
+
 ## [0.1.0-alpha.28] - 2026-06-26
+
+> [!NOTE]
+> This is a repository and build process milestone tag validating the Homebrew formula. The CLI binary version remains at `0.1.0-alpha.27`.
 
 ### Added
 - Homebrew formula validation for the `0.1.0-alpha.27` release artifact.

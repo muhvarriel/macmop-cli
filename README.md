@@ -1,195 +1,115 @@
 # MacMop CLI
 
-Safety-first macOS cleanup CLI.
+Safety-first macOS cleanup and maintenance utility.
 
 Repository: https://github.com/muhvarriel/macmop-cli
 
-## MVP Safety Rules
+## Safety-First Architecture
 
-- Default mode is dry-run.
-- Destructive actions must flow through `ActionPlan`.
-- Modules produce findings; only `executor` mutates files.
-- `--apply` moves files to Trash.
-- `--permanent` requires `--force`.
-- No sudo in core MVP. System paths are report-only.
-- JSON output uses `schema_version: "1.0"`.
+MacMop CLI is designed from the ground up to prevent accidental data loss and system instability:
+- **Dry-run by Default**: No mutations occur unless explicitly requested via the `--apply` flag.
+- **Trash-first Model**: All deletions flow through reversible moves to the macOS native `.Trash` folder.
+- **Transaction Rollback Engine**: Actions are grouped under a shared `RollbackId` per execution. Trashed items can be restored cleanly back to their exact original locations using the rollback CLI.
+- **Strict Allowlisting & Validation**: Destructive actions are restricted to specific user directories (e.g., `~/Library/Caches`). Arbitrary paths and critical system paths (`/System`, `/Library`, `/Applications`) are blocked.
+- **No Sudo Requirement**: MacMop operates entirely in user space. It never requests privilege escalation or executes commands as root.
+- **Audit Logging**: Every filesystem mutation is logged sequentially with a timestamp, action name, target path, and outcome.
 
-## Commands
+---
 
-```bash
-macmop cleanup --dry-run
-macmop cleanup --apply
-macmop disk ~ --depth 3
-macmop clutter ~/Downloads
-macmop duplicates ~/Downloads ~/Documents
-macmop report last
-macmop rollback list
-macmop rollback apply <id> --apply
-macmop scan
-macmop apps list
-macmop apps inspect "Example.app"
-macmop apps leftovers
-macmop apps uninstall <app>   # dry-run plan only in alpha
-macmop startup list
-macmop startup inspect com.example.helper
-macmop startup disable com.example.helper
-macmop startup enable com.example.helper
-macmop protect scan
-macmop protect startup
-macmop protect inspect protect_startup_abc123
-macmop privacy scan
-macmop privacy browsers
-macmop privacy recent
-macmop maintenance list
-macmop maintenance check
-macmop maintenance run flush_dns  # flush DNS cache (macOS only, not reversible)
-macmop status --json
-macmop cloud providers
-macmop cloud scan
-```
+## Installation
 
-## First-Time Setup
+### 1. Via Homebrew (Local Formula)
 
-This project requires Cargo dependencies to be fetched once:
+Install using the verified local tap:
 
 ```bash
-cargo fetch
-cargo generate-lockfile
+brew tap local/macmop
+# Point Formula/macmop.rb to the target release asset and install
+brew install --build-from-source Formula/macmop.rb
 ```
 
-After dependencies are available locally, validation can run offline:
+### 2. From GitHub Release Binaries
 
-```bash
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all
-```
+Download the compiled binary for Apple Silicon macOS (`aarch64-apple-darwin`):
 
-## Install From Source
+1. Download `macmop-v0.1.0-alpha.27-aarch64-apple-darwin.tar.gz` and its `.sha256` checksum from the GitHub Releases page.
+2. Extract the archive:
+   ```bash
+   tar -xzf macmop-v0.1.0-alpha.27-aarch64-apple-darwin.tar.gz
+   ```
+3. Move the binary into your PATH (e.g., `/usr/local/bin` or `~/bin`).
 
-Install the current checkout with Cargo:
+### 3. From Source
+
+If you have Rust installed, install the latest revision directly:
 
 ```bash
 cargo install --path .
-macmop --version
 ```
 
-Uninstall the source-installed binary:
+---
+
+## Command Examples
+
+### Dry-run Scans (Safe Previews)
 
 ```bash
-cargo uninstall macmop
+# Scan system junk (caches, logs, derived data)
+macmop cleanup
+
+# Scan user LaunchAgents for security persistence issues
+macmop protect scan
+
+# Inspect privacy-related browser caches and recent items
+macmop privacy scan
 ```
 
-Safe local install verification without mutating your normal Cargo bin directory:
+### Applying Mutations (Reversible Moves)
 
 ```bash
-cargo install --path . --root /private/tmp/macmop-install-root
-/private/tmp/macmop-install-root/bin/macmop --help
-/private/tmp/macmop-install-root/bin/macmop --version
+# Clean up caches and logs (moves to Trash)
+macmop cleanup --apply
+
+# Disable a user LaunchAgent (renames plist deterministically)
+macmop startup disable com.example.helper
+
+# Quarantine a suspicious agent
+macmop protect quarantine protect_startup_abc123
+
+# Clean recent files list and browser caches
+macmop privacy recent --apply
+macmop privacy browsers --apply
+
+# Flush macOS DNS resolver cache (not reversible)
+macmop maintenance run flush_dns --apply
 ```
 
-Release build verification:
+### Rollbacks (Undo Actions)
 
 ```bash
-cargo build --release
-./target/release/macmop --version
+# List all reversible transactions in the database
+macmop rollback list
+
+# Restore all files from a specific transaction
+macmop rollback apply <rollback-id> --apply
 ```
 
-Expected alpha.11 version output:
+---
 
-```text
-macmop 0.1.0-alpha.11
-```
+## Known Limitations (Beta Readiness)
 
-## Homebrew Formula Draft
+- **macOS only**: Relies on macOS directory layout (`~/Library`) and commands (e.g., `dscacheutil`). Not supported on Linux or Windows.
+- **User space only**: Directories requiring root permission or system files (e.g., `/System`) are skipped or treated as report-only.
+- **Non-reversible commands**: `maintenance run flush_dns` executes system DNS cache flushing and does not support rollback.
+- **Duplicates module**: Finding duplicates is supported in read-only mode; deletion is not available.
+- **TUI dashboard**: Interactive dashboard (`macmop tui`) is currently read-only.
 
-A draft formula is available at `Formula/macmop.rb` for future tap publishing. The formula is not installable yet and should not be installed until the release archive SHA256 is replaced.
+---
 
-Tagged source archives use this URL pattern:
+## Security Policy
 
-```text
-https://github.com/muhvarriel/macmop-cli/archive/refs/tags/v0.1.0-alpha.11.tar.gz
-```
+Please read [SECURITY.md](SECURITY.md) to report security vulnerabilities.
 
-GitHub-generated tag archives and archives generated by `scripts/release/package.sh` can have different SHA256 values. Use the SHA from the exact archive URL that Homebrew will download.
+## License
 
-## Release Checklist
-
-Run the release validation script:
-
-```bash
-scripts/release/check.sh
-```
-
-Verify the working tree is clean before tagging:
-
-```bash
-git diff --check
-git status --short
-```
-
-After creating a tag, generate a local source archive and checksum:
-
-```bash
-scripts/release/package.sh --ref v0.1.0-alpha.11 --out-dir dist
-cd dist
-shasum -a 256 -c macmop-v0.1.0-alpha.11.tar.gz.sha256
-```
-
-Only update `Formula/macmop.rb` with a real `sha256` after choosing and publishing the exact archive URL.
-
-## Validation
-
-Preferred local workflow:
-
-```bash
-rtk cargo fmt --check
-rtk cargo clippy --all-targets --all-features -- -D warnings
-rtk cargo test --all
-```
-
-Contributor fallback:
-
-```bash
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all
-```
-
-## Safety Model & Test Overrides
-
-MacMop CLI enforces strict safety policies to prevent accidental data loss:
-- **Trash by Default**: Items removed during `cleanup` or other subcommands are moved to `.Trash` instead of permanent deletion.
-- **Rollback Engine**: Rollback entries are saved under `~/.config/macmop/rollback` to revert files back to their original locations.
-- **Dry-run by Default**: All scans and subcommands do not perform mutations unless run with `--apply` or `--permanent --force`.
-- **Privacy Metadata Only**: Privacy scans never read or emit shell history contents; shell history files are reported by path/size/existence metadata only.
-- **Maintenance Preflight Only**: `maintenance check` does not run maintenance tasks. It only reports what MacMop may support in a future guarded execution slice.
-
-### Test Environment Variables
-When `MACMOP_TEST_MODE=1` is set, you can override standard directories to isolate runs (useful for integration tests and manual QA):
-- `MACMOP_HOME`: Overrides the home directory.
-- `MACMOP_DATA_DIR`: Overrides the CLI configuration and data directory.
-- `MACMOP_TRASH_DIR`: Overrides the target Trash directory.
-- `MACMOP_AUDIT_FILE`: Overrides the location of the audit log JSON.
-- `MACMOP_ROLLBACK_FILE`: Overrides the location of the rollback database JSON.
-- `MACMOP_APPS_DIRS`: Colon-separated list of directories to search for `.app` bundles (overrides `/Applications` and `~/Applications`).
-
-## Alpha Limitations
-
-This version (`v0.1.0-alpha.11`) is a preview release with several limitations:
-- **macOS only**: Not verified on other operating systems.
-- **No sudo support**: Will skip directories requiring root access.
-- **No app uninstall**: Application leftovers can be reported, but bundle removal is disabled.
-- **No TUI**: The TUI dashboard is not yet implemented.
-- **Disjoint Cleanup Roots**: Scans are bounded to allowlisted cache, logs, and derived data paths only.
-- **Missing Modules**: `privacy` module is not yet included in this preview.
-- **Apps module is report-only**: `apps list`, `apps inspect`, `apps leftovers` are read-only; no deletion or uninstall.
-- **Startup module supports disable/enable**: `startup disable <label>` and `startup enable <label>` are supported for user LaunchAgents; permanent deletion is blocked.
-- **Protect module supports quarantine/restore**: `protect quarantine <finding-id>` and `protect restore <quarantine-id>` are supported for user LaunchAgents; permanent deletion is blocked.
-- **Privacy module supports browser/recent cleanup**: `privacy browsers --apply` and `privacy recent --apply` are supported for caches and recent-items. Privacy cleanup currently supports browser cache and recent-item artifacts only. Cookies, passwords, sessions, autofill, shell history, and arbitrary files are never modified. `privacy scan --apply` and permanent deletions are blocked.
-- **Maintenance module supports DNS flushing**: `macmop maintenance run flush_dns --apply` is supported on macOS to flush system DNS resolver cache. Execution does not require sudo/root access. Other maintenance tasks (`rebuild_spotlight`, `thin_time_machine_snapshots`, `rotate_logs`) remain report-only/deferred. DNS flushing is not reversible; no rollback entry is created. Permanent deletion mode (`--permanent`) is blocked.
-- **Alpha.7 refactor-only release**: Module files were split internally; CLI behavior and JSON schemas are unchanged from alpha.6.
-- **Alpha.8 distribution hygiene release**: Source install docs, release checks, and a draft Homebrew formula were added; CLI behavior and JSON schemas are unchanged from alpha.7.
-- **Status module is read-only**: `status` reports support/debug context with bounded sampled home traversal; it does not write audit or rollback records.
-- **Alpha.10 package hygiene release**: Cargo metadata, MIT license, and release archive guidance were added; CLI behavior and JSON schemas are unchanged from alpha.9.
-- **Alpha.11 release automation release**: Release check/package scripts and checksum guidance were added; CLI behavior and JSON schemas are unchanged from alpha.10.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
