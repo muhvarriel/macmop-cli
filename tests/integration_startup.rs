@@ -388,3 +388,252 @@ fn test_startup_items_are_always_report_only() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_startup_disable_dry_run_creates_no_files() -> Result<()> {
+    let env = TestEnv::new("dry_run");
+    env.create_plist(
+        "com.dry.agent.plist",
+        "com.dry.agent",
+        &["/bin/sh"],
+        false,
+        false,
+    );
+    let ctx = env.ctx_user_agent();
+
+    let envelope = startup::run(
+        &ctx,
+        macmop::cli::StartupArgs {
+            command: macmop::cli::StartupCommand::Disable {
+                id: "com.dry.agent".to_string(),
+            },
+        },
+    )?;
+
+    assert_eq!(
+        envelope.payload["execution"].as_str().unwrap(),
+        "not_executed"
+    );
+    assert!(!ctx.paths.audit_file.exists());
+    assert!(!ctx.paths.rollback_file.exists());
+    Ok(())
+}
+
+#[test]
+fn test_startup_disable_ambiguity_fails() -> Result<()> {
+    let env = TestEnv::new("ambiguity");
+    env.create_plist(
+        "com.helper.one.plist",
+        "com.helper.one",
+        &["/bin/sh"],
+        false,
+        false,
+    );
+    env.create_plist(
+        "com.helper.two.plist",
+        "com.helper.two",
+        &["/bin/sh"],
+        false,
+        false,
+    );
+    let ctx = env.ctx_user_agent();
+
+    let res = startup::run(
+        &ctx,
+        macmop::cli::StartupArgs {
+            command: macmop::cli::StartupCommand::Disable {
+                id: "com.helper".to_string(),
+            },
+        },
+    );
+
+    assert!(res.is_err());
+    assert!(res.unwrap_err().to_string().contains("Ambiguous query"));
+    Ok(())
+}
+
+#[test]
+fn test_startup_disable_system_path_blocked() -> Result<()> {
+    let env = TestEnv::new("system_blocked");
+    // Create a plist inside a simulated system folder
+    let system_agents = env._base.join("Library/LaunchAgents");
+    fs::create_dir_all(&system_agents)?;
+    let system_plist = system_agents.join("com.system.agent.plist");
+    fs::write(&system_plist, b"")?;
+
+    let mut ctx = env.ctx_user_agent();
+    // Simulate that user tries to disable it, but we make sure source validation checks it
+    // Set startup_dirs to point to system_agents as if it was listed, but it has system source
+    ctx.paths.startup_dirs = vec![(system_agents.clone(), "system_launch_agents".to_string())];
+
+    let res = startup::run(
+        &ctx,
+        macmop::cli::StartupArgs {
+            command: macmop::cli::StartupCommand::Disable {
+                id: system_plist.to_string_lossy().to_string(),
+            },
+        },
+    );
+
+    assert!(res.is_err());
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("Startup item must be inside user LaunchAgents"));
+    Ok(())
+}
+
+#[test]
+fn test_startup_disable_permanent_blocked() -> Result<()> {
+    let env = TestEnv::new("perm_blocked");
+    env.create_plist(
+        "com.perm.agent.plist",
+        "com.perm.agent",
+        &["/bin/sh"],
+        false,
+        false,
+    );
+    let mut ctx = env.ctx_user_agent();
+    ctx.mode = ExecutionMode::Permanent { force: true };
+
+    let res = startup::run(
+        &ctx,
+        macmop::cli::StartupArgs {
+            command: macmop::cli::StartupCommand::Disable {
+                id: "com.perm.agent".to_string(),
+            },
+        },
+    );
+
+    assert!(res.is_err());
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("Startup module does not support permanent delete yet"));
+    Ok(())
+}
+
+#[test]
+fn test_startup_disable_apply_moves_to_disabled_and_logs() -> Result<()> {
+    let env = TestEnv::new("apply_disable");
+    let plist_path = env.create_plist(
+        "com.apply.agent.plist",
+        "com.apply.agent",
+        &["/bin/sh"],
+        false,
+        false,
+    );
+    let mut ctx = env.ctx_user_agent();
+    ctx.mode = ExecutionMode::Apply;
+
+    let envelope = startup::run(
+        &ctx,
+        macmop::cli::StartupArgs {
+            command: macmop::cli::StartupCommand::Disable {
+                id: "com.apply.agent".to_string(),
+            },
+        },
+    )?;
+
+    assert_eq!(envelope.payload["execution"].as_str().unwrap(), "executed");
+    assert_eq!(envelope.payload["moved_count"].as_u64().unwrap(), 1);
+
+    // Original file should be gone
+    assert!(!plist_path.exists());
+
+    // Disabled file should exist in data_dir
+    let disabled_dir = ctx.paths.data_dir.join("disabled_launchagents");
+    assert!(disabled_dir.exists());
+
+    // Rollback and audit should exist
+    assert!(ctx.paths.audit_file.exists());
+    assert!(ctx.paths.rollback_file.exists());
+    Ok(())
+}
+
+#[test]
+fn test_startup_enable_conflict_does_not_overwrite() -> Result<()> {
+    let env = TestEnv::new("enable_conflict");
+    let plist_path = env.create_plist(
+        "com.conflict.agent.plist",
+        "com.conflict.agent",
+        &["/bin/sh"],
+        false,
+        false,
+    );
+    let mut ctx = env.ctx_user_agent();
+    ctx.mode = ExecutionMode::Apply;
+
+    // 1. Disable it
+    let envelope = startup::run(
+        &ctx,
+        macmop::cli::StartupArgs {
+            command: macmop::cli::StartupCommand::Disable {
+                id: "com.conflict.agent".to_string(),
+            },
+        },
+    )?;
+    assert_eq!(envelope.payload["moved_count"].as_u64().unwrap(), 1);
+
+    // 2. Create another file at original path to simulate conflict
+    fs::write(&plist_path, b"conflict")?;
+
+    // 3. Try to enable it -> should fail safely
+    let res = startup::run(
+        &ctx,
+        macmop::cli::StartupArgs {
+            command: macmop::cli::StartupCommand::Enable {
+                id: "com.conflict.agent".to_string(),
+            },
+        },
+    );
+
+    assert!(res.is_err());
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("Enable conflict: target path already exists"));
+    Ok(())
+}
+
+#[test]
+fn test_startup_disable_rollback_restores() -> Result<()> {
+    let env = TestEnv::new("rollback_disable");
+    let plist_path = env.create_plist(
+        "com.roll.agent.plist",
+        "com.roll.agent",
+        &["/bin/sh"],
+        false,
+        false,
+    );
+    let mut ctx = env.ctx_user_agent();
+    ctx.mode = ExecutionMode::Apply;
+
+    let envelope = startup::run(
+        &ctx,
+        macmop::cli::StartupArgs {
+            command: macmop::cli::StartupCommand::Disable {
+                id: "com.roll.agent".to_string(),
+            },
+        },
+    )?;
+
+    assert!(!plist_path.exists());
+    let r_id = envelope.payload["rollback_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Call rollback apply
+    let rollback_env = macmop::modules::rollback::run(
+        &ctx,
+        macmop::cli::RollbackArgs {
+            command: macmop::cli::RollbackCommand::Apply { id: r_id.clone() },
+        },
+    )?;
+
+    assert!(rollback_env.payload["applied"].as_bool().unwrap());
+    // Plist should be restored!
+    assert!(plist_path.exists());
+    Ok(())
+}

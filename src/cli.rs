@@ -235,6 +235,16 @@ pub enum StartupCommand {
         /// The Label of the startup item (e.g. com.example.helper)
         id: String,
     },
+    /// Disable a user LaunchAgent by moving it to disabled directory
+    Disable {
+        /// The Label or filename of the user LaunchAgent (e.g. com.example.helper)
+        id: String,
+    },
+    /// Enable a user LaunchAgent by moving it back from disabled directory
+    Enable {
+        /// The Label or filename of the user LaunchAgent (e.g. com.example.helper)
+        id: String,
+    },
 }
 
 #[derive(Debug, Args, Clone)]

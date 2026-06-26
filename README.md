@@ -32,6 +32,8 @@ macmop apps leftovers
 macmop apps uninstall <app>   # dry-run plan only in alpha
 macmop startup list
 macmop startup inspect com.example.helper
+macmop startup disable com.example.helper
+macmop startup enable com.example.helper
 macmop protect scan
 macmop protect startup
 macmop protect inspect protect_startup_abc123

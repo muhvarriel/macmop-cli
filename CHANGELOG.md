@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.22] - 2026-06-26
+
+### Added
+- Subcommands `macmop startup disable <label>` and `macmop startup enable <label>`.
+- Support for safely moving user LaunchAgents plists to a MacMop-managed disabled directory.
+- Revalidation safety checks immediately before plist relocation.
+- Collision avoidance using deterministic hashed filenames for disabled plists.
+- Overwrite conflict prevention during plist enablement.
+- Rollback entry creation and rollback support.
+
+### Changed
+- Blocked system LaunchAgents/LaunchDaemons, sudo, and permanent deletions.
+
 ## [0.1.0-alpha.21] - 2026-06-26
 
 ### Added
