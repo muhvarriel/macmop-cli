@@ -53,6 +53,7 @@ impl TestEnv {
             rollback_file: self.rollback_file.clone(),
             apps_dirs: vec![],
             startup_dirs: vec![],
+            quicklook_dirs: vec![],
         };
         ctx
     }

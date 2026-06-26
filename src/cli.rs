@@ -91,6 +91,8 @@ pub enum Command {
     Startup(StartupArgs),
     /// Scan for protection/persistence risks and suspicious items (report-only)
     Protect(ProtectArgs),
+    /// Scan for privacy-related artifacts and metadata (report-only)
+    Privacy(PrivacyArgs),
 }
 
 #[derive(Debug, Args, Clone)]
@@ -225,6 +227,22 @@ pub enum ProtectCommand {
         /// The finding ID (e.g. protect_startup_...)
         id: String,
     },
+}
+
+#[derive(Debug, Args, Clone)]
+pub struct PrivacyArgs {
+    #[command(subcommand)]
+    pub command: PrivacyCommand,
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum PrivacyCommand {
+    /// Scan all privacy artifacts (browsers, recent, quicklook, shell history)
+    Scan,
+    /// Scan and display browser cache/history privacy artifacts specifically
+    Browsers,
+    /// Scan and display recent items and shell history specifically
+    Recent,
 }
 
 #[cfg(test)]

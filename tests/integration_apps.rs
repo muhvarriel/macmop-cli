@@ -73,6 +73,7 @@ impl TestEnv {
             rollback_file: self._base.join("data/rollback.json"),
             apps_dirs: vec![self.apps_dir.clone()],
             startup_dirs: vec![],
+            quicklook_dirs: vec![],
         };
         ctx
     }

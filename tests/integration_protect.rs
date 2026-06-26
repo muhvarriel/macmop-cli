@@ -57,6 +57,7 @@ impl TestEnv {
                     "system_launch_agents".to_string(),
                 ),
             ],
+            quicklook_dirs: vec![],
         };
         ctx
     }
@@ -146,7 +147,12 @@ fn test_protect_shell_based_args_produces_finding() -> Result<()> {
         "com.example.shell"
     );
     assert_eq!(finding.get("severity").unwrap().as_str().unwrap(), "medium");
-    assert!(!finding.get("evidence").unwrap().as_array().unwrap().is_empty());
+    assert!(!finding
+        .get("evidence")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .is_empty());
     assert_eq!(
         finding.get("action").unwrap().as_str().unwrap(),
         "report_only"

@@ -103,6 +103,7 @@ impl AppContext {
         };
 
         let startup_dirs = default_startup_dirs(&home);
+        let quicklook_dirs = default_quicklook_dirs(&home);
 
         Ok(Self {
             paths: AppPaths {
@@ -113,6 +114,7 @@ impl AppContext {
                 rollback_file,
                 apps_dirs,
                 startup_dirs,
+                quicklook_dirs,
             },
             mode,
             output,
@@ -144,6 +146,7 @@ pub struct AppPaths {
     pub apps_dirs: Vec<PathBuf>,
     /// (directory, source_label) — e.g. ("~/Library/LaunchAgents", "user_launch_agents")
     pub startup_dirs: Vec<(PathBuf, String)>,
+    pub quicklook_dirs: Vec<PathBuf>,
 }
 
 fn default_apps_dirs(home: &std::path::Path) -> Vec<PathBuf> {
@@ -165,6 +168,10 @@ fn default_startup_dirs(home: &std::path::Path) -> Vec<(PathBuf, String)> {
             "system_launch_daemons".to_string(),
         ),
     ]
+}
+
+fn default_quicklook_dirs(home: &std::path::Path) -> Vec<PathBuf> {
+    vec![home.join("Library/Caches/com.apple.QuickLook.thumbnailcache")]
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -407,6 +414,17 @@ pub struct ProtectFinding {
     pub is_protected: bool,
     pub evidence: Vec<String>,
     pub recommendation: String,
+    pub action: PlannedActionKind,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PrivacyFinding {
+    pub id: String,
+    pub category: String, // browser_cache | recent_items | quicklook_cache | shell_history
+    pub path: PathBuf,
+    pub size_bytes: u64,
+    pub count: Option<usize>,
+    pub detail: String,
     pub action: PlannedActionKind,
 }
 

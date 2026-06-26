@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.5] - 2026-06-26
+
+### Added
+- **`privacy` module** (report-only): read-only privacy artifact metadata inventory.
+  - `privacy scan`: scan all categories — browser caches, recent items, QuickLook cache, and shell history.
+  - `privacy browsers`: scan browser cache directories only (Safari, Chrome, Firefox, Firefox profile `cache2`).
+  - `privacy recent`: scan recent items artifacts and shell history files only.
+- **New core type**: `PrivacyFinding` with `id`, `category`, `path`, `size_bytes`, `count`, `detail`, `action = report_only`.
+- **Test seam**: `quicklook_dirs: Vec<PathBuf>` added to `AppPaths` for injecting QuickLook cache directories in tests.
+- **Safety guarantees**:
+  - Shell history is detected as metadata only (path, size, existence) — **content is never read or emitted**.
+  - Recent items artifacts reported as metadata only — **contents not parsed or printed**.
+  - Permission-denied errors yield warnings, not crashes.
+- **7 new integration tests** in `tests/integration_privacy.rs` (47 total).
+
 ## [0.1.0-alpha.4] - 2026-06-26
 
 ### Added

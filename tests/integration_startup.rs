@@ -115,6 +115,7 @@ impl TestEnv {
             rollback_file: self._base.join("data/rollback.json"),
             apps_dirs: vec![],
             startup_dirs: vec![(self.agents_dir.clone(), source.to_string())],
+            quicklook_dirs: vec![],
         };
         ctx
     }

@@ -32,6 +32,9 @@ macmop startup inspect com.example.helper
 macmop protect scan
 macmop protect startup
 macmop protect inspect protect_startup_abc123
+macmop privacy scan
+macmop privacy browsers
+macmop privacy recent
 ```
 
 ## First-Time Setup
@@ -97,5 +100,6 @@ This version (`v0.1.0-alpha.4`) is a preview release with several limitations:
 - **Apps module is report-only**: `apps list`, `apps inspect`, `apps leftovers` are read-only; no deletion or uninstall.
 - **Startup module is report-only**: `startup list` and `startup inspect` are read-only; no enable/disable support yet.
 - **Protect module is report-only**: `protect scan`, `protect startup`, and `protect inspect` are read-only; no quarantine or deletion.
+- **Privacy module is report-only**: `privacy scan`, `privacy browsers`, and `privacy recent` are read-only metadata inventory; no clearing or deletion.
 
 
